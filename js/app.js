@@ -35,53 +35,6 @@
     } catch (e) { /* 忽略隐私模式异常 */ }
   }
 
-  /* 微信内置浏览器检测与提示弹窗 */
-  function maybeWeChat() {
-    var ua = navigator.userAgent || "";
-    if (/MicroMessenger/i.test(ua)) showWxModal();
-  }
-
-  /* 复制文本到剪贴板（兼容无 Clipboard API 的旧 WebView） */
-  function copyText(t) {
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(t);
-        return true;
-      }
-    } catch (e) { /* 降级 */ }
-    try {
-      var ta = document.createElement("textarea");
-      ta.value = t;
-      ta.setAttribute("readonly", "");
-      ta.style.position = "fixed";
-      ta.style.top = "-9999px";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.focus(); ta.select();
-      var ok = document.execCommand && document.execCommand("copy");
-      document.body.removeChild(ta);
-      return !!ok;
-    } catch (e) { return false; }
-  }
-
-  /* 弹窗：提供一键复制链接，便于在系统浏览器打开（微信无法由网页直接跳转） */
-  function showWxModal() {
-    if (document.getElementById("wxModal")) return;
-    var m = document.createElement("div");
-    m.className = "wx-mask";
-    m.id = "wxModal";
-    m.innerHTML =
-      '<div class="wx-box">' +
-      "<h3>请在浏览器中打开</h3>" +
-      '<p class="wx-tip">微信内无法直接跳转系统浏览器。点击下方按钮复制链接，再粘贴到系统浏览器地址栏，即可获得完整体验。</p>' +
-      '<button type="button" class="wx-jump" data-act="wxjump">复制链接，去浏览器打开</button>' +
-      '<p class="wx-copied" id="wxCopied" style="display:none"></p>' +
-      '<div class="wx-alt">或点页面右上角 ··· → 在浏览器中打开</div>' +
-      '<a href="#" class="wx-skip" data-act="wxclose">暂不使用，继续浏览</a>' +
-      "</div>";
-    document.body.appendChild(m);
-  }
-
   var NAV = [
     { v: "overview", zh: "集团概况" },
     { v: "org", zh: "组织架构" },
@@ -413,21 +366,6 @@
     } else if (act === "review") {
       toggleReviewed(el.getAttribute("data-id"));
       render();
-    } else if (act === "wxclose") {
-      var wx = document.getElementById("wxModal");
-      if (wx && wx.parentNode) wx.parentNode.removeChild(wx);
-    } else if (act === "wxjump") {
-      var url = location.href;
-      try { window.open(url, "_blank"); } catch (e) { /* 微信内无效，忽略 */ }
-      var copied = copyText(url);
-      var c = document.getElementById("wxCopied");
-      if (c) {
-        c.style.display = "block";
-        c.textContent = copied
-          ? "已复制 ✓ 去系统浏览器粘贴地址栏打开即可"
-          : "复制失败，请手动复制地址栏链接";
-      }
-      if (el && el.tagName === "BUTTON") el.textContent = "已复制，去浏览器打开";
     }
     } catch (err) {
       showBootError("交互执行出错：" + (err && err.message ? err.message : String(err)));
@@ -445,8 +383,7 @@
       '<div class="card"><div class="blk-h">错误定位</div><p style="margin:0;color:var(--ink-soft)">' +
       esc(msg) + "</p></div>" +
       '<div class="card"><div class="blk-h">建议操作</div><ul class="plain">' +
-      "<li>微信内：点击右上角 ··· → 在浏览器中打开，使用系统默认浏览器访问。</li>" +
-      "<li>其他环境：检查网络后刷新页面（下拉刷新或重新进入）。</li>" +
+      "<li>检查网络后刷新页面（下拉刷新或重新进入）。</li>" +
       "<li>若反复异常，请清除浏览器缓存或更换浏览器后重试。</li>" +
       "</ul></div></div>";
   }
@@ -507,10 +444,9 @@
     }
   });
 
-  // 启动：多步验证 + 微信弹框（成功后才弹，避免干扰错误展示）
+  // 启动：多步验证（防白屏）
   try {
-    var ok = boot();
-    if (ok) maybeWeChat();
+    boot();
   } catch (err) {
     showBootError("初始化失败：" + (err && err.message ? err.message : String(err)));
   }
