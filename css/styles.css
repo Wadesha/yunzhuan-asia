@@ -350,6 +350,38 @@ ul.plain li { margin: 4px 0; }
 .report.reviewed h3, .report.reviewed .r-summary { color: var(--muted); }
 .reviewed-flag { font-size: 12px; letter-spacing: 1px; color: var(--muted); }
 
+/* ---------- 防白屏：静态横幅 / 降级内容 / 错误面板 ---------- */
+.wx-banner { display: none; }
+html.is-wx .wx-banner {
+  display: block;
+  background: var(--warn);
+  color: #fff;
+  border-bottom: 1px solid #6f471f;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.wx-banner-in {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 10px 24px;
+}
+.wx-banner-in strong { display: block; letter-spacing: 1px; margin-bottom: 2px; }
+.wx-banner-in span { color: #fbeede; }
+
+.boot-fallback { color: var(--ink); }
+.boot-fallback .blk-h {
+  font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--accent-2); margin-bottom: 4px;
+}
+
+.boot-error { color: var(--ink); }
+.boot-error .page-title { color: var(--warn); }
+.boot-error .card { border-color: #c9a06a; background: #fbf6ee; }
+.boot-error .blk-h {
+  font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--warn); margin-bottom: 4px;
+}
+
 /* ---------- 微信内置浏览器提示 ---------- */
 .wx-mask {
   position: fixed; inset: 0; z-index: 1000;
