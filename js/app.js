@@ -35,11 +35,36 @@
     } catch (e) { /* 忽略隐私模式异常 */ }
   }
 
-  /* 微信内置浏览器检测与提示弹框 */
+  /* 微信内置浏览器检测与提示弹窗 */
   function maybeWeChat() {
     var ua = navigator.userAgent || "";
     if (/MicroMessenger/i.test(ua)) showWxModal();
   }
+
+  /* 复制文本到剪贴板（兼容无 Clipboard API 的旧 WebView） */
+  function copyText(t) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(t);
+        return true;
+      }
+    } catch (e) { /* 降级 */ }
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = t;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.top = "-9999px";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      var ok = document.execCommand && document.execCommand("copy");
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch (e) { return false; }
+  }
+
+  /* 弹窗：提供一键复制链接，便于在系统浏览器打开（微信无法由网页直接跳转） */
   function showWxModal() {
     if (document.getElementById("wxModal")) return;
     var m = document.createElement("div");
@@ -47,12 +72,12 @@
     m.id = "wxModal";
     m.innerHTML =
       '<div class="wx-box">' +
-      "<h3>建议使用系统浏览器打开</h3>" +
-      "<p>检测到您正在使用微信内置浏览器，部分交互功能可能受限。</p>" +
-      '<ul class="steps"><li>点击页面右上角的 ··· 菜单</li>' +
-      '<li>选择「在浏览器中打开」</li>' +
-      "<li>使用系统默认浏览器获得完整体验</li></ul>" +
-      '<a href="#" class="btn" data-act="wxclose">知道了，继续浏览</a>' +
+      "<h3>请在浏览器中打开</h3>" +
+      '<p class="wx-tip">微信内无法直接跳转系统浏览器。点击下方按钮复制链接，再粘贴到系统浏览器地址栏，即可获得完整体验。</p>' +
+      '<button type="button" class="wx-jump" data-act="wxjump">复制链接，去浏览器打开</button>' +
+      '<p class="wx-copied" id="wxCopied" style="display:none"></p>' +
+      '<div class="wx-alt">或点页面右上角 ··· → 在浏览器中打开</div>' +
+      '<a href="#" class="wx-skip" data-act="wxclose">暂不使用，继续浏览</a>' +
       "</div>";
     document.body.appendChild(m);
   }
@@ -391,6 +416,18 @@
     } else if (act === "wxclose") {
       var wx = document.getElementById("wxModal");
       if (wx && wx.parentNode) wx.parentNode.removeChild(wx);
+    } else if (act === "wxjump") {
+      var url = location.href;
+      try { window.open(url, "_blank"); } catch (e) { /* 微信内无效，忽略 */ }
+      var copied = copyText(url);
+      var c = document.getElementById("wxCopied");
+      if (c) {
+        c.style.display = "block";
+        c.textContent = copied
+          ? "已复制 ✓ 去系统浏览器粘贴地址栏打开即可"
+          : "复制失败，请手动复制地址栏链接";
+      }
+      if (el && el.tagName === "BUTTON") el.textContent = "已复制，去浏览器打开";
     }
     } catch (err) {
       showBootError("交互执行出错：" + (err && err.message ? err.message : String(err)));
