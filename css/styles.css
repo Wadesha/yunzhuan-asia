@@ -1,0 +1,364 @@
+/* ============================================================
+   寰宇零售集团 · 内网站式样式
+   设计原则：纯文本 · 无 icon / emoji · 靠排版与层级建立秩序
+   ============================================================ */
+
+:root {
+  --ink:        #1c1c1e;   /* 主文字 */
+  --ink-soft:   #3a3a3e;   /* 次级文字 */
+  --muted:      #76767c;   /* 弱化文字 */
+  --line:       #d9d9d4;   /* 分隔线 */
+  --line-soft:  #e8e8e3;   /* 浅分隔 */
+  --paper:      #ffffff;   /* 卡片 */
+  --bg:         #f3f2ee;   /* 页面底 */
+  --accent:     #2f4858;   /* 企业深蓝灰 */
+  --accent-2:   #5b7384;   /* 次级蓝灰 */
+  --accent-bg:  #eef1f3;   /* 浅蓝底 */
+  --warn:       #8a5a2b;   /* 提示棕 */
+  --max:        1180px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", -apple-system,
+               "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* ---------- 外层布局 ---------- */
+.shell {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.site-head {
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+.site-head .shell {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 22px;
+  padding-bottom: 22px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.brand .mark {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 2px;
+  color: var(--paper);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 6px 10px;
+  line-height: 1;
+}
+.brand .names { line-height: 1.25; }
+.brand .zh { font-size: 18px; font-weight: 700; letter-spacing: 1px; }
+.brand .en {
+  font-size: 11px; color: var(--muted); letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.site-head .tagline {
+  font-size: 13px; color: var(--muted); letter-spacing: 1px;
+}
+
+/* ---------- 主导航 ---------- */
+.nav {
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.nav .shell { display: flex; gap: 0; flex-wrap: wrap; }
+.nav a {
+  padding: 14px 18px;
+  font-size: 14px;
+  letter-spacing: 1px;
+  color: var(--ink-soft);
+  border-bottom: 2px solid transparent;
+  transition: color .15s;
+}
+.nav a:hover { color: var(--accent); }
+.nav a.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+/* ---------- 主体两栏 ---------- */
+.layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 0;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 24px;
+  align-items: start;
+}
+.side {
+  position: sticky;
+  top: 53px;
+  padding: 28px 18px 28px 0;
+  border-right: 1px solid var(--line);
+  align-self: start;
+}
+.side .side-h {
+  font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--muted); margin: 0 0 10px;
+}
+.side a {
+  display: block;
+  padding: 8px 12px;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  border-left: 2px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.side a:hover { background: var(--accent-bg); color: var(--accent); }
+.side a.active {
+  border-left-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+.side .grp { margin-top: 18px; }
+
+.main { padding: 28px 0 60px 32px; min-width: 0; }
+
+/* ---------- 通用排版 ---------- */
+h1, h2, h3, h4 { font-weight: 700; color: var(--ink); line-height: 1.3; }
+.page-title {
+  font-size: 26px; letter-spacing: 1px; margin: 0 0 4px;
+  font-family: Georgia, "Noto Serif SC", serif;
+}
+.page-sub { color: var(--muted); font-size: 14px; margin: 0 0 26px; }
+.section-h {
+  font-size: 13px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--accent-2); margin: 34px 0 14px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--line-soft);
+}
+.lead { font-size: 15.5px; color: var(--ink-soft); max-width: 70ch; }
+
+/* 层级徽标（纯文本） */
+.lvl {
+  display: inline-block;
+  font-size: 11px; font-weight: 700; letter-spacing: 1px;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 1px 7px; line-height: 1.5;
+  background: var(--paper);
+}
+.lvl.sm { font-size: 10.5px; padding: 0 6px; }
+
+/* 标签（纯文本） */
+.tag {
+  display: inline-block;
+  font-size: 11.5px; letter-spacing: .5px;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: 2px 9px;
+  margin: 0 6px 6px 0;
+}
+.tag.fill { background: var(--accent-bg); border-color: var(--accent-bg); color: var(--accent); }
+
+/* 卡片 */
+.card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 22px 24px;
+  margin-bottom: 16px;
+}
+.card .meta {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  margin-bottom: 6px;
+}
+.card h3 { margin: 2px 0 2px; font-size: 18px; }
+.card .en { color: var(--muted); font-size: 12.5px; letter-spacing: .5px; }
+
+/* 事实表 */
+.facts {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1px; background: var(--line); border: 1px solid var(--line);
+  margin-top: 18px;
+}
+.facts .cell { background: var(--paper); padding: 16px 18px; }
+.facts .k { font-size: 12px; color: var(--muted); letter-spacing: 1px; }
+.facts .v { font-size: 17px; font-weight: 700; margin-top: 4px; font-family: Georgia, serif; }
+
+/* 部门表格 */
+table.grid {
+  width: 100%; border-collapse: collapse; background: var(--paper);
+  border: 1px solid var(--line); font-size: 14px;
+}
+table.grid th, table.grid td {
+  text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
+}
+table.grid th {
+  background: var(--accent-bg); color: var(--accent);
+  font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+  font-weight: 700;
+}
+table.grid tr:last-child td { border-bottom: none; }
+table.grid td.idx { color: var(--muted); font-family: Georgia, serif; width: 36px; }
+table.grid .dept-name { font-weight: 600; }
+table.grid .dept-en { color: var(--muted); font-size: 12px; }
+
+/* 列表 */
+ul.clean { list-style: none; margin: 8px 0 0; padding: 0; }
+ul.clean li {
+  padding: 7px 0 7px 18px; position: relative; color: var(--ink-soft);
+  border-bottom: 1px dashed var(--line-soft);
+}
+ul.clean li:last-child { border-bottom: none; }
+ul.clean li::before {
+  content: "—"; position: absolute; left: 0; color: var(--accent-2);
+}
+ul.plain { margin: 6px 0 0; padding-left: 18px; color: var(--ink-soft); }
+ul.plain li { margin: 4px 0; }
+
+/* 职位卡 */
+.pos {
+  border: 1px solid var(--line); border-left: 3px solid var(--accent);
+  background: var(--paper); padding: 18px 22px; margin-bottom: 14px;
+}
+.pos .head { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; }
+.pos h3 { margin: 0; font-size: 17px; }
+.pos .en { color: var(--muted); font-size: 12.5px; }
+.pos .reports { color: var(--muted); font-size: 13px; margin: 6px 0 10px; }
+.pos .reports b { color: var(--ink-soft); font-weight: 600; }
+.pos .blk-h {
+  font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--accent-2); margin: 14px 0 4px;
+}
+
+/* 报告筛选条 */
+.filters {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px;
+  padding: 14px 16px; background: var(--paper); border: 1px solid var(--line);
+}
+.filters .fl {
+  font-size: 13px; padding: 5px 12px; border: 1px solid var(--line);
+  background: var(--paper); color: var(--ink-soft); cursor: pointer;
+  letter-spacing: .5px;
+}
+.filters .fl:hover { border-color: var(--accent-2); color: var(--accent); }
+.filters .fl.on {
+  background: var(--accent); border-color: var(--accent); color: var(--paper);
+}
+.filters .fl-grp { display: flex; align-items: center; gap: 8px; }
+.filters .fl-label {
+  font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--muted); margin-right: 2px;
+}
+
+/* 报告卡 */
+.report {
+  border: 1px solid var(--line); background: var(--paper);
+  padding: 18px 22px; margin-bottom: 14px; cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+.report:hover { border-color: var(--accent-2); box-shadow: 0 2px 0 var(--accent-bg); }
+.report .r-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.report h3 { margin: 4px 0 2px; font-size: 17px; }
+.report .r-sub { color: var(--muted); font-size: 13px; }
+.report .r-summary { color: var(--ink-soft); margin-top: 8px; }
+.report .r-metrics {
+  display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px;
+}
+.report .metric {
+  border: 1px solid var(--line); padding: 6px 12px; background: var(--bg);
+}
+.report .metric .mk { font-size: 11px; color: var(--muted); letter-spacing: .5px; }
+.report .metric .mv { font-size: 15px; font-weight: 700; font-family: Georgia, serif; }
+
+/* 报告详情 */
+.detail-head { border-bottom: 1px solid var(--line); padding-bottom: 16px; margin-bottom: 18px; }
+.detail-head .r-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+.detail-head h2 { margin: 0; font-size: 22px; }
+.back {
+  display: inline-block; margin-bottom: 16px; font-size: 13px;
+  color: var(--accent); border: 1px solid var(--accent); padding: 5px 12px;
+  letter-spacing: .5px;
+}
+.back:hover { background: var(--accent); color: var(--paper); }
+.report-block { margin-bottom: 18px; }
+.report-block .rb-h {
+  font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--accent-2); margin-bottom: 6px;
+  padding-left: 10px; border-left: 2px solid var(--accent);
+}
+
+/* 页脚 */
+.foot {
+  border-top: 1px solid var(--line); background: var(--paper);
+  color: var(--muted); font-size: 12.5px; letter-spacing: .5px;
+}
+.foot .shell { padding: 22px 24px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+
+/* 空状态 */
+.empty { color: var(--muted); padding: 30px 0; text-align: center; }
+
+/* 响应式 */
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; }
+  .side { position: static; border-right: none; border-bottom: 1px solid var(--line);
+          padding: 16px 0; display: flex; gap: 6px; flex-wrap: wrap; }
+  .side .side-h, .side .grp { display: none; }
+  .side a { border-left: none; border-bottom: 2px solid transparent; padding: 6px 10px; }
+  .side a.active { border-left: none; border-bottom-color: var(--accent); }
+  .main { padding: 22px 0 50px; }
+  .facts { grid-template-columns: repeat(2, 1fr); }
+  .site-head .tagline { display: none; }
+}
+@media (max-width: 520px) {
+  .facts { grid-template-columns: 1fr; }
+  .brand .en { display: none; }
+}
+
+/* ---------- 批阅按钮与状态 ---------- */
+.btn {
+  display: inline-block; font-size: 13px; letter-spacing: .5px;
+  padding: 6px 16px; border: 1px solid var(--accent); color: var(--accent);
+  background: var(--paper); cursor: pointer;
+}
+.btn:hover { background: var(--accent); color: var(--paper); }
+.btn.done { border-color: var(--muted); color: var(--muted); background: var(--bg); }
+.btn.done:hover { background: var(--muted); color: var(--paper); }
+.r-actions { margin-top: 12px; }
+.report.reviewed { background: var(--bg); }
+.report.reviewed h3, .report.reviewed .r-summary { color: var(--muted); }
+.reviewed-flag { font-size: 12px; letter-spacing: 1px; color: var(--muted); }
+
+/* ---------- 微信内置浏览器提示 ---------- */
+.wx-mask {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(20,20,22,.82);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.wx-box { background: var(--paper); border: 1px solid var(--line); max-width: 440px; padding: 28px 26px; }
+.wx-box h3 { margin: 0 0 10px; font-size: 18px; }
+.wx-box p { color: var(--ink-soft); margin: 0 0 14px; }
+.wx-box .steps { color: var(--ink-soft); margin: 0 0 18px; padding-left: 18px; }
+.wx-box .steps li { margin: 4px 0; }
+.wx-box .btn { display: block; text-align: center; }
