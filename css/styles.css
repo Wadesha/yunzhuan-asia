@@ -364,29 +364,3 @@ ul.plain li { margin: 4px 0; }
   font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase;
   color: var(--warn); margin-bottom: 4px;
 }
-
-/* ---------- 微信内置浏览器弹窗（一键复制链接跳转） ---------- */
-.wx-mask {
-  position: fixed; inset: 0; z-index: 1000;
-  background: rgba(20,20,22,.82);
-  display: flex; align-items: center; justify-content: center; padding: 24px;
-}
-.wx-box {
-  background: var(--paper); border: 1px solid var(--line);
-  max-width: 420px; width: 100%; padding: 30px 26px; text-align: center;
-}
-.wx-box h3 { margin: 0 0 12px; font-size: 20px; letter-spacing: 1px; }
-.wx-box .wx-tip { color: var(--ink-soft); margin: 0 0 22px; font-size: 14px; }
-.wx-jump {
-  display: block; width: 100%; font-size: 15px; letter-spacing: 1px;
-  padding: 13px 16px; border: 1px solid var(--accent); color: #fff;
-  background: var(--accent); cursor: pointer; font-family: inherit;
-}
-.wx-jump:hover { background: var(--accent-2); border-color: var(--accent-2); }
-.wx-copied { color: var(--warn); font-size: 13px; margin: 14px 0 0; letter-spacing: .5px; }
-.wx-alt { color: var(--muted); font-size: 12.5px; margin-top: 18px; letter-spacing: .5px; }
-.wx-skip {
-  display: inline-block; margin-top: 12px; font-size: 13px;
-  color: var(--accent); border-bottom: 1px solid transparent;
-}
-.wx-skip:hover { border-bottom-color: var(--accent); }
