@@ -5,8 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>寰宇零售集团 · 内部职位与周报站</title>
   <link rel="stylesheet" href="css/styles.css">
+
+  <!-- 早期微信检测：在任何脚本渲染前即时标记，驱动静态横幅显示，独立于 SPA -->
+  <script>
+    (function () {
+      try {
+        var ua = (navigator.userAgent || "");
+        if (/MicroMessenger/i.test(ua)) {
+          document.documentElement.className += " is-wx";
+        }
+      } catch (e) { /* 忽略 */ }
+    })();
+  </script>
 </head>
 <body>
+
+  <!-- 微信内置浏览器静态横幅：即使 JS 完全不执行也可见，确保永不纯空白 -->
+  <div class="wx-banner" id="wxBanner" role="alert">
+    <div class="wx-banner-in">
+      <strong>建议使用系统默认浏览器打开</strong>
+      <span>检测到微信内置浏览器，部分交互可能受限。请点击右上角 ··· → 在浏览器中打开 → 选择系统默认浏览器，以获得完整体验。</span>
+    </div>
+  </div>
 
   <!-- 页头 -->
   <header class="site-head">
@@ -30,7 +50,29 @@
   <!-- 主体 -->
   <div class="layout" id="layout">
     <aside class="side" id="side"></aside>
-    <main class="main" id="main"></main>
+    <main class="main" id="main">
+      <!-- 静态降级内容：仅在 JS 未执行或渲染报错时可见，确保页面永不纯空白 -->
+      <div id="bootFallback" class="boot-fallback">
+        <h1 class="page-title">寰宇零售集团</h1>
+        <p class="page-sub">GlobalSphere Retail Group · 内部职位介绍与每周工作报告系统</p>
+        <p class="lead">连接全球市场，服务每一位顾客。本站为集团内部职位介绍与每周工作报告系统，数据为演示样例。</p>
+        <div class="card">
+          <div class="blk-h">正在加载交互界面…</div>
+          <p style="margin:8px 0 0;color:var(--muted)">
+            若本提示长时间停留，说明浏览器未能执行本站脚本。请用系统默认浏览器打开本页：
+            微信内点击右上角 ··· → 在浏览器中打开；其他环境请刷新或检查网络后重试。
+          </p>
+        </div>
+        <div class="section-h">站点栏目</div>
+        <ul class="plain">
+          <li>集团概况</li>
+          <li>组织架构</li>
+          <li>部门与职位</li>
+          <li>每周工作报告</li>
+          <li>管理后台</li>
+        </ul>
+      </div>
+    </main>
   </div>
 
   <!-- 页脚 -->
@@ -40,6 +82,14 @@
       <span>仅限集团内部使用 · 数据为演示样例</span>
     </div>
   </footer>
+
+  <!-- 无脚本兜底（极少数禁用 JS 的环境） -->
+  <noscript>
+    <div class="boot-fallback" style="max-width:1180px;margin:0 auto;padding:28px 24px">
+      <h1 class="page-title">寰宇零售集团</h1>
+      <p class="lead">本站需要启用 JavaScript 才能使用完整交互。请用支持 JavaScript 的浏览器打开，或在微信内点击右上角 ··· → 在浏览器中打开。</p>
+    </div>
+  </noscript>
 
   <script src="js/data.js"></script>
   <script src="js/app.js"></script>
