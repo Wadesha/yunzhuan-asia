@@ -350,11 +350,21 @@
     window.scrollTo(0, 0);
   }
 
+  /* 兼容旧版 WebView（无 Element.closest）的冒泡查找 */
+  function closestAct(node) {
+    while (node && node !== document.body) {
+      if (node.getAttribute && node.getAttribute("data-act")) return node;
+      node = node.parentNode;
+    }
+    return null;
+  }
+
   /* ---------------- 事件委托 ---------------- */
   document.addEventListener("click", function (e) {
-    var el = e.target.closest("[data-act]");
+    var el = e.target && e.target.closest ? e.target.closest("[data-act]") : closestAct(e.target);
     if (!el) return;
     e.preventDefault();
+    try {
     var act = el.getAttribute("data-act");
     if (act === "nav") {
       state.view = el.getAttribute("data-view");
@@ -382,9 +392,89 @@
       var wx = document.getElementById("wxModal");
       if (wx && wx.parentNode) wx.parentNode.removeChild(wx);
     }
+    } catch (err) {
+      showBootError("交互执行出错：" + (err && err.message ? err.message : String(err)));
+    }
   });
 
-  // 初次渲染
-  render();
-  maybeWeChat();
+  /* ---------------- 错误面板（防白屏兜底） ---------------- */
+  function showBootError(msg) {
+    var m = document.getElementById("main");
+    if (!m) return;
+    m.innerHTML =
+      '<div class="boot-error">' +
+      '<h1 class="page-title">页面加载异常</h1>' +
+      '<p class="lead">系统未能正常渲染本页。错误详情如下，可截图反馈给内部系统管理员。</p>' +
+      '<div class="card"><div class="blk-h">错误定位</div><p style="margin:0;color:var(--ink-soft)">' +
+      esc(msg) + "</p></div>" +
+      '<div class="card"><div class="blk-h">建议操作</div><ul class="plain">' +
+      "<li>微信内：点击右上角 ··· → 在浏览器中打开，使用系统默认浏览器访问。</li>" +
+      "<li>其他环境：检查网络后刷新页面（下拉刷新或重新进入）。</li>" +
+      "<li>若反复异常，请清除浏览器缓存或更换浏览器后重试。</li>" +
+      "</ul></div></div>";
+  }
+
+  /* ---------------- 多步反复验证机制 ---------------- */
+  function boot() {
+    // 第 1 步：数据模块加载校验
+    if (typeof GROUP === "undefined" || !GROUP)
+      { showBootError("数据模块未加载（data.js 未执行或被拦截）。"); return false; }
+    if (typeof LEVELS === "undefined" || !LEVELS)
+      { showBootError("数据模块缺失：LEVELS。"); return false; }
+    if (typeof DEPARTMENTS === "undefined" || !DEPARTMENTS)
+      { showBootError("数据模块缺失：DEPARTMENTS。"); return false; }
+    if (typeof REPORTS === "undefined" || !REPORTS)
+      { showBootError("数据模块缺失：REPORTS。"); return false; }
+
+    // 第 2 步：DOM 挂载点校验
+    var navEl = document.getElementById("nav");
+    var sideEl = document.getElementById("side");
+    var mainEl = document.getElementById("main");
+    if (!navEl || !sideEl || !mainEl)
+      { showBootError("页面骨架缺失（#nav / #side / #main 未找到）。"); return false; }
+
+    // 第 3 步：首屏渲染校验
+    try { render(); }
+    catch (err) {
+      showBootError("首屏渲染失败：" + (err && err.message ? err.message : String(err)));
+      return false;
+    }
+
+    // 第 4 步：各视图冒烟测试（确保任一视图不会单独报错导致白屏）
+    var views = ["overview", "org", "positions", "reports", "admin"];
+    for (var i = 0; i < views.length; i++) {
+      try {
+        state.view = views[i];
+        if (views[i] === "positions") state.posDept = DEPARTMENTS[0].id;
+        var html = mainHtml();
+        if (!html || html.length < 5)
+          { showBootError("视图「" + views[i] + "」渲染结果为空。"); return false; }
+      } catch (err) {
+        showBootError("视图「" + views[i] + "」渲染异常：" + (err && err.message ? err.message : String(err)));
+        return false;
+      }
+    }
+
+    // 第 5 步：恢复首页并标记启动成功
+    state.view = "overview";
+    state.posDept = DEPARTMENTS[0].id;
+    render();
+    window.__gsBooted = true;
+    return true;
+  }
+
+  // 全局兜底：脚本运行期未捕获错误也展示面板，避免无声白屏
+  window.addEventListener("error", function (e) {
+    if (!window.__gsBooted) {
+      showBootError("脚本运行出错：" + (e && e.message ? e.message : "未知错误"));
+    }
+  });
+
+  // 启动：多步验证 + 微信弹框（成功后才弹，避免干扰错误展示）
+  try {
+    var ok = boot();
+    if (ok) maybeWeChat();
+  } catch (err) {
+    showBootError("初始化失败：" + (err && err.message ? err.message : String(err)));
+  }
 })();
