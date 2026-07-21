@@ -108,32 +108,74 @@ a{color:inherit;text-decoration:none;}
   var state = { phase:"start", list:[], idx:0, sel:{}, graded:{}, correct:0, wrong:0, reading:false,
                 filter:"all", shuffle:false, autoRead:false, lastReadId:null };
   var AUTOREAD_KEY = "peixun_jianhu_autoread_v1";
+  var PROGRESS_KEY = "peixun_jianhu_progress_v1";
   function loadAutoRead(){ try { return localStorage.getItem(AUTOREAD_KEY)==="1"; } catch(e){ return false; } }
   function saveAutoRead(){ try { localStorage.setItem(AUTOREAD_KEY, state.autoRead?"1":"0"); } catch(e){} }
   state.autoRead = loadAutoRead();
+
+  // 进度持久化（断点续刷）
+  function loadProgress(){
+    try {
+      var p = JSON.parse(localStorage.getItem(PROGRESS_KEY) || "null");
+      if(!p || !p.qids || !p.qids.length) return null;
+      return p;
+    } catch(e){ return null; }
+  }
+  function saveProgress(){
+    try {
+      if(state.phase!=="quiz" || !state.list.length) return;
+      localStorage.setItem(PROGRESS_KEY, JSON.stringify({
+        qids: state.list.map(function(q){ return q.id; }),
+        idx: state.idx, sel: state.sel, graded: state.graded,
+        correct: state.correct, wrong: state.wrong,
+        filter: state.filter, shuffle: state.shuffle, ts: Date.now()
+      }));
+    } catch(e){}
+  }
+  function clearProgress(){ try { localStorage.removeItem(PROGRESS_KEY); } catch(e){} }
 
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
   function letterOf(i){ return String.fromCharCode(65+i); }
 
   // 语音朗读（Web Speech API，纯前端，只读题干）
-  var synth = window.speechSynthesis || null;
-  var zhVoice = null;
+  var speechOK = !!(window.speechSynthesis) && (typeof SpeechSynthesisUtterance !== "undefined");
+  var synth = speechOK ? window.speechSynthesis : null;
+  var zhVoice = null, voiceReady = false, speechUnlocked = false, _speakToken = 0;
   function pickVoice(){
     if(!synth) return;
     var vs = synth.getVoices() || [];
     zhVoice = vs.filter(function(v){ return /zh|cmn|Chinese/i.test(v.lang + " " + v.name); })[0] || null;
+    voiceReady = vs.length > 0;
   }
-  if(synth){ pickVoice(); if("onvoiceschanged" in synth) synth.onvoiceschanged = pickVoice; }
+  function unlockSpeech(){ speechUnlocked = true; if(synth && !voiceReady) pickVoice(); }
+  if(synth){
+    pickVoice();
+    if("onvoiceschanged" in synth) synth.onvoiceschanged = pickVoice;
+    setTimeout(pickVoice, 250); // 部分浏览器首次异步加载嗓音
+  }
   function stopRead(){ if(synth) synth.cancel(); }
   function readAloud(text){
     if(!synth) return;
     synth.cancel();
+    var tok = ++_speakToken;
     var u = new SpeechSynthesisUtterance(String(text == null ? "" : text));
     u.lang = "zh-CN"; u.rate = 1; u.pitch = 1;
     if(zhVoice) u.voice = zhVoice;
-    u.onend = function(){ state.reading = false; render(); };
-    u.onerror = function(){ state.reading = false; render(); };
+    u.onend = function(){ if(tok!==_speakToken) return; state.reading = false; renderReadBtn(); };
+    u.onerror = function(){ if(tok!==_speakToken) return; state.reading = false; renderReadBtn(); };
     synth.speak(u);
+    // 移动端 Chromium 偶发不发声：稍后检测，未开始则重试一次
+    setTimeout(function(){
+      if(tok!==_speakToken) return;
+      try { if(synth && !synth.speaking) synth.speak(u); } catch(e){}
+    }, 300);
+  }
+  function renderReadBtn(){
+    var el = document.querySelector("#app .btn.read");
+    if(!el) return;
+    var active = state.reading;
+    el.className = "btn read" + (active ? " on" : "");
+    el.textContent = active ? "停止朗读" : "朗读题干";
   }
 
   function selectedValue(q, sel){
@@ -203,8 +245,60 @@ a{color:inherit;text-decoration:none;}
     }).join("");
   }
 
+  function appEl(){ return document.getElementById("app"); }
+
+  // 局部更新：避免整题 innerHTML 重建导致的布局跳动
+  function paintOptions(q){
+    var graded = !!state.graded[q.id];
+    var cur = state.sel[q.id];
+    var corr = correctIdx(q);
+    var isMulti = q.type==="multi";
+    var opts = appEl().querySelectorAll(".q .opt");
+    for(var i=0;i<opts.length;i++){
+      var el = opts[i];
+      var oi = parseInt(el.getAttribute("data-opt"),10);
+      var selected = isMulti ? (cur && cur.indexOf(oi)>=0) : (cur===oi);
+      var cls = "opt";
+      if(graded){
+        if(corr.indexOf(oi)>=0) cls += " ok";
+        else if(selected) cls += " no";
+      } else if(selected){
+        cls += " on";
+      }
+      el.className = cls;
+    }
+  }
+  function showFeedback(q){
+    var fb = appEl().querySelector(".q .fb");
+    if(state.graded[q.id]){
+      var isCor = grade(q, state.sel[q.id]);
+      var html = '<div class="fb '+(isCor?"ok":"no")+'">'+(isCor?"回答正确":"回答错误")+
+                 ' · 正确答案：'+esc(answerText(q))+'</div>';
+      if(fb){
+        var tmp = document.createElement("div"); tmp.innerHTML = html;
+        fb.parentNode.replaceChild(tmp.firstChild, fb);
+      } else {
+        var acts = appEl().querySelector(".q .acts");
+        if(acts) acts.insertAdjacentHTML("beforebegin", html);
+      }
+    } else if(fb){ fb.parentNode.removeChild(fb); }
+  }
+  function renderActions(q){
+    var acts = appEl().querySelector(".q .acts");
+    if(!acts) return;
+    var graded = !!state.graded[q.id];
+    var html = "";
+    if(graded){ html = '<button class="btn primary" data-act="next">下一题</button>'; }
+    else if(q.type==="multi"){
+      var has = state.sel[q.id] && state.sel[q.id].length>0;
+      html = '<button class="btn primary" data-act="confirm"'+(has?'':' disabled style="opacity:.45;cursor:not-allowed;"')+'>确认本题</button>';
+    } else { html = ''; }
+    acts.innerHTML = html;
+  }
+
   function renderStart(){
     var wn = loadWrong().length;
+    var p = loadProgress();
     var chip = function(v,label){ return '<span class="chip'+(state.filter===v?" on":"")+'" data-act="filter" data-v="'+v+'">'+label+'</span>'; };
     var app = document.getElementById("app");
     app.innerHTML =
@@ -216,9 +310,11 @@ a{color:inherit;text-decoration:none;}
         '<span class="chip'+(state.shuffle?" on":"")+'" data-act="toggle-shuffle">乱序：'+(state.shuffle?"开":"关")+'</span>'+
         '<span class="chip'+(state.autoRead?" on":"")+'" data-act="toggle-autoread">自动朗读：'+(state.autoRead?"开":"关")+'</span></div>'+
       '<div class="acts">'+
-        '<button class="btn primary" data-act="start">开始刷题</button>'+
+        (p? '<button class="btn" data-act="resume">继续上次（第 '+Math.min(p.idx+1, p.qids.length)+' / '+p.qids.length+' 题）</button>':'')+
+        '<button class="btn primary" data-act="start">'+(p?'重新开始':'开始刷题')+'</button>'+
         (wn? '<button class="btn ghost" data-act="wrong">重练错题（'+wn+'）</button>':'')+
-      '</div>';
+      '</div>'+
+      (p? '<p class="hint">已为你保存上次进度，可「继续上次」或「重新开始」。</p>':'');
   }
 
   function renderQuiz(){
@@ -246,21 +342,29 @@ a{color:inherit;text-decoration:none;}
       hint = '<div class="hint">点击选项即可自动判分</div>';
       actBtn = '';
     }
+    var readNote = (!speechOK) ? '<div class="hint">当前浏览器不支持语音朗读，可手动阅读题干。</div>'
+                  : (state.autoRead ? '<div class="hint">已开启自动朗读（移动端需先在页面内点击一次以解锁声音）。</div>' : '');
     app.innerHTML =
       '<div class="bar"><div class="meta">第 '+(state.idx+1)+' / '+total+' 题 · '+TYPE_ZH[q.type]+'</div>'+
         '<div class="score">答对 '+state.correct+' · 答错 '+state.wrong+'</div></div>'+
       '<div class="prog"><div class="fill" style="width:'+(100*(state.idx+1)/total)+'%"></div></div>'+
       '<div class="q"><div class="qt">'+esc(q.q)+'</div>'+
-        '<button class="btn read'+(state.reading||autoFire?' on':'')+'" data-act="read"'+(synth?'':' disabled style="opacity:.45;cursor:not-allowed;" title="当前浏览器不支持语音朗读"')+'>'+(state.reading||autoFire?'⏹ 停止朗读':'🔊 朗读题干')+'</button>'+
+        '<button class="btn read'+(state.reading||autoFire?' on':'')+'" data-act="read"'+(speechOK?'':' disabled style="opacity:.45;cursor:not-allowed;" title="当前浏览器不支持语音朗读"')+'>'+(state.reading||autoFire?'停止朗读':'朗读题干')+'</button>'+
+        readNote+
         '<div class="opts">'+hint+optHtml(q)+'</div>'+
         (graded?fb:'')+
         '<div class="acts">'+actBtn+'</div>'+
       '</div>';
-    if(autoFire){ state.lastReadId = q.id; state.reading = true; readAloud(q.q); }
+    if(autoFire){
+      state.lastReadId = q.id; state.reading = true;
+      // 延迟触发，确保处于用户手势窗口内且 DOM 已绘制
+      setTimeout(function(){ readAloud(q.q); }, 80);
+    }
   }
 
   function renderSummary(){
     var app = document.getElementById("app");
+    clearProgress();
     var total = state.list.length;
     var acc = total? Math.round(100*state.correct/total):0;
     var wrongItems = state.list.filter(function(q){ return !grade(q, state.sel[q.id]); })
@@ -296,51 +400,72 @@ a{color:inherit;text-decoration:none;}
     if(!t) return;
     e.preventDefault();
     try {
+      unlockSpeech();
       var _act0 = t.getAttribute("data-act");
       if(_act0 !== "read"){ stopRead(); state.reading = false; }
       var optAttr = t.getAttribute("data-opt");
       if(optAttr!=null){
         var q = state.list[state.idx];
-        if(state.graded[q.id]) return;
+        if(state.graded[q.id]) return; // 已判分则忽略，避免重复
         var oi = parseInt(optAttr,10);
         if(q.type==="multi"){
           var arr = state.sel[q.id] || [];
           var k = arr.indexOf(oi);
           if(k>=0) arr.splice(k,1); else arr.push(oi);
           state.sel[q.id] = arr;
+          // 仅局部更新该选项样式 + 提交按钮状态，不重建整题
+          var el = appEl().querySelector('.q .opt[data-opt="'+oi+'"]');
+          if(el) el.className = "opt" + (arr.indexOf(oi)>=0 ? " on" : "");
+          renderActions(q);
         } else {
           state.sel[q.id] = oi;
           doGrade(q);
+          // 局部更新：选项对/错样式、反馈区、操作按钮
+          paintOptions(q);
+          showFeedback(q);
+          renderActions(q);
         }
-        render();
+        saveProgress();
         return;
       }
       var act = t.getAttribute("data-act");
       if(act==="filter"){ state.filter = t.getAttribute("data-v"); render(); }
       else if(act==="toggle-shuffle"){ state.shuffle=!state.shuffle; render(); }
       else if(act==="toggle-autoread"){ state.autoRead=!state.autoRead; saveAutoRead(); render(); }
-      else if(act==="start"){ state.phase="quiz"; buildList(false); render(); }
+      else if(act==="start"){ clearProgress(); state.phase="quiz"; buildList(false); render(); }
       else if(act==="wrong"){
         if(!loadWrong().length){ return; }
-        state.phase="quiz"; buildList(true); render();
+        clearProgress(); state.phase="quiz"; buildList(true); render();
+      }
+      else if(act==="resume"){
+        var p = loadProgress(); if(!p) return;
+        state.list = p.qids.map(function(id){ return QBANK.find(function(q){ return q.id===id; }); }).filter(Boolean);
+        if(!state.list.length) return;
+        state.idx = Math.min(p.idx||0, state.list.length-1);
+        state.sel = p.sel || {}; state.graded = p.graded || {};
+        state.correct = p.correct||0; state.wrong = p.wrong||0;
+        state.filter = p.filter; state.shuffle = p.shuffle;
+        state.phase="quiz"; state.lastReadId=null; render();
       }
       else if(act==="confirm"){
         var qc = state.list[state.idx];
         if(state.graded[qc.id]) return;
         if(!(state.sel[qc.id] && state.sel[qc.id].length>0)) return;
-        doGrade(qc); render();
+        doGrade(qc);
+        paintOptions(qc); showFeedback(qc); renderActions(qc);
+        saveProgress();
       }
       else if(act==="next"){
         state.idx++;
-        if(state.idx >= state.list.length){ state.phase="summary"; }
-        render();
+        if(state.idx >= state.list.length){ state.phase="summary"; render(); }
+        else { render(); }
+        saveProgress();
       }
-      else if(act==="again"){ state.phase="quiz"; buildList(false); render(); }
-      else if(act==="home"){ state.phase="start"; render(); }
+      else if(act==="again"){ clearProgress(); state.phase="quiz"; buildList(false); render(); }
+      else if(act==="home"){ clearProgress(); state.phase="start"; render(); }
       else if(act==="read"){
-        if(state.reading){ stopRead(); state.reading = false; }
-        else { readAloud(state.list[state.idx].q); state.reading = true; state.lastReadId = state.list[state.idx].id; }
-        render();
+        if(state.reading){ stopRead(); state.reading = false; renderReadBtn(); }
+        else { readAloud(state.list[state.idx].q); state.reading = true; state.lastReadId = state.list[state.idx].id; renderReadBtn(); }
       }
     } catch(err){
       document.getElementById("app").innerHTML = '<div class="empty">交互出错：'+esc(String(err&&err.message||err))+'</div>';
