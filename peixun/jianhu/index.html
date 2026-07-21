@@ -105,11 +105,32 @@ a{color:inherit;text-decoration:none;}
   function markWrong(id){ var w=loadWrong(); if(w.indexOf(id)<0){ w.push(id); saveWrong(w); } }
   function clearWrong(id){ var w=loadWrong(); var i=w.indexOf(id); if(i>=0){ w.splice(i,1); saveWrong(w); } }
 
-  var state = { phase:"start", list:[], idx:0, sel:{}, graded:{}, correct:0, wrong:0,
+  var state = { phase:"start", list:[], idx:0, sel:{}, graded:{}, correct:0, wrong:0, reading:false,
                 filter:"all", shuffle:false };
 
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
   function letterOf(i){ return String.fromCharCode(65+i); }
+
+  // 语音朗读（Web Speech API，纯前端，只读题干）
+  var synth = window.speechSynthesis || null;
+  var zhVoice = null;
+  function pickVoice(){
+    if(!synth) return;
+    var vs = synth.getVoices() || [];
+    zhVoice = vs.filter(function(v){ return /zh|cmn|Chinese/i.test(v.lang + " " + v.name); })[0] || null;
+  }
+  if(synth){ pickVoice(); if("onvoiceschanged" in synth) synth.onvoiceschanged = pickVoice; }
+  function stopRead(){ if(synth) synth.cancel(); }
+  function readAloud(text){
+    if(!synth) return;
+    synth.cancel();
+    var u = new SpeechSynthesisUtterance(String(text == null ? "" : text));
+    u.lang = "zh-CN"; u.rate = 1; u.pitch = 1;
+    if(zhVoice) u.voice = zhVoice;
+    u.onend = function(){ state.reading = false; render(); };
+    u.onerror = function(){ state.reading = false; render(); };
+    synth.speak(u);
+  }
 
   function selectedValue(q, sel){
     if(sel==null) return null;
@@ -224,6 +245,7 @@ a{color:inherit;text-decoration:none;}
         '<div class="score">答对 '+state.correct+' · 答错 '+state.wrong+'</div></div>'+
       '<div class="prog"><div class="fill" style="width:'+(100*(state.idx+1)/total)+'%"></div></div>'+
       '<div class="q"><div class="qt">'+esc(q.q)+'</div>'+
+        '<button class="btn read'+(state.reading?' on':'')+'" data-act="read"'+(synth?'':' disabled style="opacity:.45;cursor:not-allowed;" title="当前浏览器不支持语音朗读"')+'>'+(state.reading?'⏹ 停止朗读':'🔊 朗读题干')+'</button>'+
         '<div class="opts">'+hint+optHtml(q)+'</div>'+
         (graded?fb:'')+
         '<div class="acts">'+actBtn+'</div>'+
@@ -267,6 +289,8 @@ a{color:inherit;text-decoration:none;}
     if(!t) return;
     e.preventDefault();
     try {
+      var _act0 = t.getAttribute("data-act");
+      if(_act0 !== "read"){ stopRead(); state.reading = false; }
       var optAttr = t.getAttribute("data-opt");
       if(optAttr!=null){
         var q = state.list[state.idx];
@@ -307,6 +331,11 @@ a{color:inherit;text-decoration:none;}
       }
       else if(act==="again"){ state.phase="quiz"; buildList(false); render(); }
       else if(act==="home"){ state.phase="start"; render(); }
+      else if(act==="read"){
+        if(state.reading){ stopRead(); state.reading = false; }
+        else { readAloud(state.list[state.idx].q); state.reading = true; }
+        render();
+      }
     } catch(err){
       document.getElementById("app").innerHTML = '<div class="empty">交互出错：'+esc(String(err&&err.message||err))+'</div>';
     }
