@@ -74,9 +74,9 @@ function click(dom, sel) {
   return true;
 }
 
-async function driveJianhu(dom) {
+async function driveJianhu(dom, skipStart) {
   const win = dom.window, doc = win.document;
-  if (!click(dom, '[data-act="start"]')) return "no-start";
+  if (!skipStart && !click(dom, '[data-act="start"]')) return "no-start";
   const QB = win.QBANK;
   for (let i = 0; i < 60; i++) {
     const qtEl = doc.querySelector("#app .q .qt");
@@ -204,6 +204,26 @@ async function driveJianhu(dom) {
       ok("E: " + rel + " 含底部导航 " + l, hasFooterLink(rel, l));
     });
   });
+
+  console.log("=== F. 连做两场 → 累计 2 条（不丢、不重）===");
+  const domF = await loadPage("jianhu/index.html", { localSeed: {} });
+  ok("F: 第一场跑完", (await driveJianhu(domF)) === "done");
+  const a1 = JSON.parse(domF.window.localStorage.getItem("peixun_jianhu_attempts_v1") || "null");
+  ok("F: 第一场后 attempts=1", Array.isArray(a1) && a1.length === 1, JSON.stringify(a1));
+  ok("F: 点「再来一次」可重新开始", click(domF, '[data-act="again"]') && !!domF.window.document.querySelector("#app .q"));
+  ok("F: 第二场跑完", (await driveJianhu(domF, true)) === "done");
+  const a2 = JSON.parse(domF.window.localStorage.getItem("peixun_jianhu_attempts_v1") || "null");
+  ok("F: 两场后 attempts=2（累加不覆盖）", Array.isArray(a2) && a2.length === 2, a2 && JSON.stringify(a2.map(x => x.total)));
+
+  console.log("=== G. 完成后 re-render 钩子不重复记（防 double-count）===");
+  const domG = await loadPage("jianhu/index.html", { localSeed: {} });
+  ok("G: 跑完一场", (await driveJianhu(domG)) === "done");
+  const before = (JSON.parse(domG.window.localStorage.getItem("peixun_jianhu_attempts_v1") || "null") || []).length;
+  // 模拟登录态 hydrate 完成后触发的全局重渲染（修复前的 bug：phase=summary 会再记一次 → 2）
+  if (domG.window.__peixunReRender) domG.window.__peixunReRender();
+  await new Promise(r => setTimeout(r, 60));
+  const after = (JSON.parse(domG.window.localStorage.getItem("peixun_jianhu_attempts_v1") || "null") || []).length;
+  ok("G: re-render 后 attempts 仍为 1（守卫防重复）", before === 1 && after === 1, "before=" + before + " after=" + after);
 
   console.log("\n=== 结果 ===");
   console.log("PASS=" + pass + "  FAIL=" + fail);
