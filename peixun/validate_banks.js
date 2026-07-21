@@ -7,10 +7,14 @@ let errors = 0, total = 0;
 for (const f of fs.readdirSync(BANKS)) {
   if (!f.endsWith(".json") || f === "_base.json" || f === "_index.json") continue;
   const id = f.replace(/\.json$/, "");
-  let arr;
-  try { arr = JSON.parse(fs.readFileSync(path.join(BANKS, f), "utf8")); }
+  let bank;
+  try { bank = JSON.parse(fs.readFileSync(path.join(BANKS, f), "utf8")); }
   catch (e) { console.log(`✗ ${id}: JSON 解析失败 ${e.message}`); errors++; continue; }
-  if (!Array.isArray(arr)) { console.log(`✗ ${id}: 不是数组`); errors++; continue; }
+  let arr;
+  if (Array.isArray(bank)) arr = bank;
+  else if (bank && Array.isArray(bank.sub)) arr = [].concat.apply([], bank.sub.map(s => s.questions || []));
+  else if (bank && Array.isArray(bank.questions)) arr = bank.questions;
+  else { console.log(`✗ ${id}: 非数组且不含 sub/questions`); errors++; continue; }
   arr.forEach((q, i) => {
     total++;
     const tag = `${id}[${i}]`;
