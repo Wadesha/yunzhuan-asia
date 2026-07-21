@@ -173,6 +173,8 @@ async function driveJianhu(dom) {
       const idx = q.answer.charCodeAt(0) - 65; const o = docD.querySelector('.q .opt[data-opt="' + idx + '"]');
       if (o) o.dispatchEvent(new winD.MouseEvent("click", { bubbles: true }));
     }
+    ok("D: 第" + s + "题判分后「保存并退出」仍在操作区", !!docD.querySelector('#app .q .acts [data-act="exit"]'),
+       docD.querySelector("#app .q .acts") ? docD.querySelector("#app .q .acts").innerHTML.slice(0, 120) : "no-acts");
     click(domD, '[data-act="next"]');
   }
   const progBefore = JSON.parse(winD.localStorage.getItem("peixun_jianhu_progress_v1") || "null");
