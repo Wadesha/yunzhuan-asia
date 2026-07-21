@@ -43,7 +43,11 @@ let bankTotal = 0, mism = 0;
 for (const f of bankFiles) {
   const id = f.replace(/\.json$/, "");
   const arr = JSON.parse(fs.readFileSync(path.join(BANKS, f), "utf8"));
-  const expect = arr.length;
+  let expect;
+  if (Array.isArray(arr)) expect = arr.length;
+  else if (arr && Array.isArray(arr.sub)) expect = [].concat.apply([], arr.sub.map(s => s.questions || [])).length;
+  else if (arr && Array.isArray(arr.questions)) expect = arr.questions.length;
+  else { console.log(`✗ ${id} bank 形态异常`); mism++; continue; }
   bankTotal += expect;
   const ex = loc[id];
   if (!ex) { console.log(`✗ catalog 中找不到考试 ${id}`); mism++; continue; }
