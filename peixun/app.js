@@ -22,6 +22,7 @@
   // 累计做题历史（每场考试完成即落盘，供历史页时间线聚合）
   var ATTEMPT_KEY = "peixun_spa_attempts_v1";
   function recordAttempt() {
+    if (quiz && quiz.attempted) return; // 每场只记一次，防止 re-render 钩子重复触发
     try {
       if (!quiz) return;
       var total = quiz.list.length; if (!total) return;
@@ -31,6 +32,7 @@
                   total: total, correct: quiz.correct, wrong: quiz.wrong, acc: acc });
       if (a.length > 50) a.length = 50;
       Sset(ATTEMPT_KEY, a);
+      quiz.attempted = true;
     } catch (e) {}
   }
   function userProgress(qkeys) {
@@ -175,7 +177,7 @@
         qkey: catId + "/" + examId + "/" + i
       };
     });
-    quiz = { catId: catId, examId: examId, list: list, idx: 0, sel: {}, graded: {}, correct: 0, wrong: 0 };
+    quiz = { catId: catId, examId: examId, list: list, idx: 0, sel: {}, graded: {}, correct: 0, wrong: 0, attempted: false };
     lastReadId = null;
     render();
   }
