@@ -33,10 +33,11 @@
     if (document.getElementById("peixun-auth-css")) return;
     var s = document.createElement("style"); s.id = "peixun-auth-css";
     s.textContent =
-      "#peixun-cloud-banner,#peixun-cloud-bar{position:fixed;left:12px;bottom:12px;z-index:9999;" +
+      "#peixun-cloud-banner{position:fixed;left:12px;bottom:12px;z-index:9999;" +
       "background:#2f4858;color:#fff;padding:10px 12px;border-radius:12px;font:13px/1.4 sans-serif;" +
       "display:flex;gap:8px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,.25)}" +
-      "#peixun-cloud-bar{right:12px;left:auto}" +
+      "#peixun-cloud-bar{display:inline-flex;gap:8px;align-items:center;background:#2f4858;color:#fff;" +
+      "padding:6px 12px;border-radius:10px;font:13px/1.4 sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.15)}" +
       "#peixun-cloud-banner button,#peixun-cloud-bar button{background:#fff;color:#2f4858;border:0;" +
       "border-radius:8px;padding:5px 12px;cursor:pointer;font:13px sans-serif}" +
       "#peixun-cloud-modal{position:fixed;inset:0;background:rgba(20,30,40,.5);z-index:10000;" +
@@ -260,7 +261,13 @@
     renderBar: function () {
       var id = loadIdentity();
       var bar = document.getElementById("peixun-cloud-bar");
-      if (!bar) { bar = document.createElement("div"); bar.id = "peixun-cloud-bar"; document.body.appendChild(bar); }
+      if (!bar) {
+        bar = document.createElement("div"); bar.id = "peixun-cloud-bar";
+        // 放进页头右上角（离开拇指误触区），无页头时回退为右上角浮动
+        var shell = document.querySelector("header.site-head .shell");
+        if (shell) { bar.style.marginLeft = "auto"; shell.appendChild(bar); }
+        else { bar.style.position = "fixed"; bar.style.top = "10px"; bar.style.right = "10px"; bar.style.zIndex = "9999"; document.body.appendChild(bar); }
+      }
       if (id) {
         bar.innerHTML = '<span>已登录（' + maskPhone(id.phone) + '）·云端同步中</span>' +
           '<button id="pc-out">退出</button>';
