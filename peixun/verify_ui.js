@@ -40,11 +40,12 @@ h = appHtml();
 ok("教资页渲染 3 个分科卡片", window.document.querySelectorAll(".subcard").length === 3);
 ok("教资页含「综合素质」分科", h.indexOf("综合素质（通用）") >= 0);
 
-// 3) 单一科目考试（律师，无分科）
+// 3) 法考（已分科：客观题/主观题）
 go("#/exam/lawfin/lawyer");
 h = appHtml();
-ok("律师页无分科卡片", window.document.querySelectorAll(".subcard").length === 0);
-ok("律师页含单「开始刷题」按钮", h.indexOf("开始刷题（11 题）") >= 0);
+ok("律师页渲染 2 个分科卡片", window.document.querySelectorAll(".subcard").length === 2);
+ok("律师页含「客观题」分科", h.indexOf("客观题") >= 0);
+ok("律师页含「主观题」分科", h.indexOf("主观题") >= 0);
 ok("律师页含考试介绍/好处", h.indexOf("考试介绍") >= 0 && h.indexOf("通过的好处") >= 0);
 
 // 4) 技能信息卡（焊工）也展示介绍/好处
@@ -65,6 +66,25 @@ firstOpt.click(); // 单选自动判分
 const fb = window.document.querySelector(".q .fb");
 ok("点击选项后渲染判分反馈", !!fb);
 ok("首题判分后含正确答案文本", fb && fb.textContent.indexOf("正确答案") >= 0);
+
+// 6) 解析/考点字段（e）在判分后展示：进入含 e 题库，逐题判分直到出现 .exp
+go("#/exam/lawfin/account");
+const accStart = window.document.querySelector('[data-act="start-quiz"]');
+ok("会计页含「开始刷题」按钮", !!accStart);
+accStart.click();
+let expShown = false;
+for (let k = 0; k < 60 && !expShown; k++) {
+  const cfm = window.document.querySelector('.acts [data-act="confirm"]');
+  if (cfm) {
+    const o = window.document.querySelector(".q .opt"); if (o) o.click();
+    const c2 = window.document.querySelector('.acts [data-act="confirm"]'); if (c2) c2.click();
+  } else {
+    const o = window.document.querySelector(".q .opt"); if (!o) break; o.click();
+  }
+  if (window.document.querySelector(".q .exp")) { expShown = true; break; }
+  const nx = window.document.querySelector('.acts [data-act="next"]'); if (nx) nx.click(); else break;
+}
+ok("判分后展示「解析/考点」(.exp)", expShown);
 
 console.log("\nUI 验证：" + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);
