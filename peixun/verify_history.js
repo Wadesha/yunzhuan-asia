@@ -150,6 +150,41 @@ async function driveJianhu(dom) {
   ok("显示错题待巩固", domC.window.document.querySelector("#wrongs-body").innerHTML.indexOf("监护错题") >= 0);
   ok("历史页注册重渲染钩子", typeof domC.window.__peixunReRender === "function");
 
+  console.log("=== D. 中途退出保留进度（保存并退出）===");
+  const domD = await loadPage("jianhu/index.html", { localSeed: {} });
+  const winD = domD.window, docD = domD.window.document;
+  ok("D: 能开始刷题", click(domD, '[data-act="start"]'));
+  // 做 2 题（每题判分 + 下一题，触发 saveProgress）
+  for (let s = 0; s < 2; s++) {
+    const qtEl = docD.querySelector("#app .q .qt");
+    if (!qtEl) break;
+    const qtext = qtEl.textContent.trim();
+    const q = winD.QBANK.find(x => x.q === qtext);
+    if (!q) { ok("D: 第" + s + "题可定位", false, qtext.slice(0, 12)); break; }
+    if (q.type === "multi") {
+      const ans = Array.isArray(q.answer) ? q.answer : [q.answer];
+      ans.forEach(L => { const idx = L.charCodeAt(0) - 65; const o = docD.querySelector('.q .opt[data-opt="' + idx + '"]'); if (o) o.dispatchEvent(new winD.MouseEvent("click", { bubbles: true })); });
+      click(domD, '[data-act="confirm"]');
+    } else if (q.type === "bool") {
+      const opts = docD.querySelectorAll("#app .q .opt");
+      let t = null; opts.forEach(o => { const lt = o.querySelector(".lt"); if (lt && lt.textContent.trim() === q.answer) t = o; });
+      if (t) t.dispatchEvent(new winD.MouseEvent("click", { bubbles: true }));
+    } else {
+      const idx = q.answer.charCodeAt(0) - 65; const o = docD.querySelector('.q .opt[data-opt="' + idx + '"]');
+      if (o) o.dispatchEvent(new winD.MouseEvent("click", { bubbles: true }));
+    }
+    click(domD, '[data-act="next"]');
+  }
+  const progBefore = JSON.parse(winD.localStorage.getItem("peixun_jianhu_progress_v1") || "null");
+  ok("D: 中途已存档进度(idx>=2)", !!(progBefore && progBefore.idx >= 2), JSON.stringify(progBefore));
+  ok("D: 做题界面有「保存并退出」按钮", !!docD.querySelector('[data-act="exit"]'));
+  click(domD, '[data-act="exit"]');
+  const appD = docD.querySelector("#app").innerHTML;
+  ok("D: 退出后首页显示「继续上次」", appD.indexOf("继续上次") >= 0, "idx=" + appD.indexOf("继续上次"));
+  const progAfter = JSON.parse(winD.localStorage.getItem("peixun_jianhu_progress_v1") || "null");
+  ok("D: 退出不清空进度存档", !!(progAfter && progAfter.idx >= 2), JSON.stringify(progAfter));
+  ok("D: 点继续上次恢复到做题界面", click(domD, '[data-act="resume"]') && !!docD.querySelector("#app .q .qt"));
+
   console.log("\n=== 结果 ===");
   console.log("PASS=" + pass + "  FAIL=" + fail);
   process.exit(fail ? 1 : 0);
