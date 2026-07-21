@@ -106,7 +106,11 @@ a{color:inherit;text-decoration:none;}
   function clearWrong(id){ var w=loadWrong(); var i=w.indexOf(id); if(i>=0){ w.splice(i,1); saveWrong(w); } }
 
   var state = { phase:"start", list:[], idx:0, sel:{}, graded:{}, correct:0, wrong:0, reading:false,
-                filter:"all", shuffle:false };
+                filter:"all", shuffle:false, autoRead:false, lastReadId:null };
+  var AUTOREAD_KEY = "peixun_jianhu_autoread_v1";
+  function loadAutoRead(){ try { return localStorage.getItem(AUTOREAD_KEY)==="1"; } catch(e){ return false; } }
+  function saveAutoRead(){ try { localStorage.setItem(AUTOREAD_KEY, state.autoRead?"1":"0"); } catch(e){} }
+  state.autoRead = loadAutoRead();
 
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
   function letterOf(i){ return String.fromCharCode(65+i); }
@@ -170,7 +174,7 @@ a{color:inherit;text-decoration:none;}
       if(state.filter!=="all") base = base.filter(function(q){ return q.type===state.filter; });
     }
     if(state.shuffle){ for(var i=base.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=base[i]; base[i]=base[j]; base[j]=t; } }
-    state.list = base; state.idx=0; state.sel={}; state.graded={}; state.correct=0; state.wrong=0;
+    state.list = base; state.idx=0; state.sel={}; state.graded={}; state.correct=0; state.wrong=0; state.lastReadId=null;
   }
 
   // 正确选项对应的下标集合
@@ -209,7 +213,8 @@ a{color:inherit;text-decoration:none;}
       '<div class="section-h">题型</div><div class="chips">'+
         chip("all","全部")+chip("single","单选")+chip("multi","多选")+(TYPE_ZH.bool?chip("bool","判断"):'')+'</div>'+
       '<div class="section-h">模式</div><div class="chips">'+
-        '<span class="chip'+(state.shuffle?" on":"")+'" data-act="toggle-shuffle">乱序：'+(state.shuffle?"开":"关")+'</span></div>'+
+        '<span class="chip'+(state.shuffle?" on":"")+'" data-act="toggle-shuffle">乱序：'+(state.shuffle?"开":"关")+'</span>'+
+        '<span class="chip'+(state.autoRead?" on":"")+'" data-act="toggle-autoread">自动朗读：'+(state.autoRead?"开":"关")+'</span></div>'+
       '<div class="acts">'+
         '<button class="btn primary" data-act="start">开始刷题</button>'+
         (wn? '<button class="btn ghost" data-act="wrong">重练错题（'+wn+'）</button>':'')+
@@ -220,6 +225,7 @@ a{color:inherit;text-decoration:none;}
     var app = document.getElementById("app");
     if(!state.list.length){ app.innerHTML='<div class="empty">该题型暂无题目。</div>'; return; }
     var q = state.list[state.idx];
+    var autoFire = state.autoRead && state.lastReadId !== q.id;
     var total = state.list.length;
     var graded = state.graded[q.id];
     var fb = "";
@@ -245,11 +251,12 @@ a{color:inherit;text-decoration:none;}
         '<div class="score">答对 '+state.correct+' · 答错 '+state.wrong+'</div></div>'+
       '<div class="prog"><div class="fill" style="width:'+(100*(state.idx+1)/total)+'%"></div></div>'+
       '<div class="q"><div class="qt">'+esc(q.q)+'</div>'+
-        '<button class="btn read'+(state.reading?' on':'')+'" data-act="read"'+(synth?'':' disabled style="opacity:.45;cursor:not-allowed;" title="当前浏览器不支持语音朗读"')+'>'+(state.reading?'⏹ 停止朗读':'🔊 朗读题干')+'</button>'+
+        '<button class="btn read'+(state.reading||autoFire?' on':'')+'" data-act="read"'+(synth?'':' disabled style="opacity:.45;cursor:not-allowed;" title="当前浏览器不支持语音朗读"')+'>'+(state.reading||autoFire?'⏹ 停止朗读':'🔊 朗读题干')+'</button>'+
         '<div class="opts">'+hint+optHtml(q)+'</div>'+
         (graded?fb:'')+
         '<div class="acts">'+actBtn+'</div>'+
       '</div>';
+    if(autoFire){ state.lastReadId = q.id; state.reading = true; readAloud(q.q); }
   }
 
   function renderSummary(){
@@ -313,6 +320,7 @@ a{color:inherit;text-decoration:none;}
       var act = t.getAttribute("data-act");
       if(act==="filter"){ state.filter = t.getAttribute("data-v"); render(); }
       else if(act==="toggle-shuffle"){ state.shuffle=!state.shuffle; render(); }
+      else if(act==="toggle-autoread"){ state.autoRead=!state.autoRead; saveAutoRead(); render(); }
       else if(act==="start"){ state.phase="quiz"; buildList(false); render(); }
       else if(act==="wrong"){
         if(!loadWrong().length){ return; }
@@ -333,7 +341,7 @@ a{color:inherit;text-decoration:none;}
       else if(act==="home"){ state.phase="start"; render(); }
       else if(act==="read"){
         if(state.reading){ stopRead(); state.reading = false; }
-        else { readAloud(state.list[state.idx].q); state.reading = true; }
+        else { readAloud(state.list[state.idx].q); state.reading = true; state.lastReadId = state.list[state.idx].id; }
         render();
       }
     } catch(err){
