@@ -49,8 +49,9 @@
   }
 
   /* ---------- 语音朗读（Web Speech API，纯前端，只读题干） ---------- */
-  var synth = window.speechSynthesis || null;
-  var zhVoice = null;
+  var speechOK = !!(window.speechSynthesis) && (typeof SpeechSynthesisUtterance !== "undefined");
+  var synth = speechOK ? window.speechSynthesis : null;
+  var zhVoice = null, voiceReady = false, speechUnlocked = false, _speakToken = 0;
   var reading = false;
   var lastReadId = null;
   var AUTO_READ_KEY = "peixun_autoread_v1";
@@ -61,19 +62,38 @@
     if(!synth) return;
     var vs = synth.getVoices() || [];
     zhVoice = vs.filter(function(v){ return /zh|cmn|Chinese/i.test(v.lang + " " + v.name); })[0] || null;
+    voiceReady = vs.length > 0;
   }
-  if(synth){ pickVoice(); if("onvoiceschanged" in synth) synth.onvoiceschanged = pickVoice; }
+  function unlockSpeech(){ speechUnlocked = true; if(synth && !voiceReady) pickVoice(); }
+  if(synth){
+    pickVoice();
+    if("onvoiceschanged" in synth) synth.onvoiceschanged = pickVoice;
+    setTimeout(pickVoice, 250); // 部分浏览器首次异步加载嗓音
+  }
   function stopRead(){ if(synth) synth.cancel(); }
   function readAloud(text){
     if(!synth) return;
     synth.cancel();
+    var tok = ++_speakToken;
     var u = new SpeechSynthesisUtterance(String(text == null ? "" : text));
     u.lang = "zh-CN"; u.rate = 1; u.pitch = 1;
     if(zhVoice) u.voice = zhVoice;
-    u.onend = function(){ reading = false; render(); };
-    u.onerror = function(){ reading = false; render(); };
+    u.onend = function(){ if(tok!==_speakToken) return; reading = false; renderReadBtn(); };
+    u.onerror = function(){ if(tok!==_speakToken) return; reading = false; renderReadBtn(); };
     synth.speak(u);
+    // 移动端 Chromium 偶发不发声：稍后检测，未开始则重试一次
+    setTimeout(function(){
+      if(tok!==_speakToken) return;
+      try { if(synth && !synth.speaking) synth.speak(u); } catch(e){}
+    }, 300);
   }
+  function renderReadBtn(){
+    var el = document.querySelector("#app .btn.read");
+    if(!el) return;
+    el.className = "btn read" + (reading ? " on" : "");
+    el.textContent = reading ? "停止朗读" : "朗读题干";
+  }
+  function appEl(){ return document.getElementById("app"); }
 
   /* ---------- 工具 ---------- */
   function esc(s) {
@@ -160,6 +180,30 @@
     record(q.qkey, ok);
   }
 
+  /* ---------- 进度持久化（断点续刷，按用户+考试隔离） ---------- */
+  function progressKey(catId, examId) {
+    return "peixun_quiz_v1_" + users.current + "_" + catId + "_" + examId;
+  }
+  function saveQuizProgress() {
+    try {
+      if (!quiz) return;
+      localStorage.setItem(progressKey(quiz.catId, quiz.examId), JSON.stringify({
+        idx: quiz.idx, sel: quiz.sel, graded: quiz.graded,
+        correct: quiz.correct, wrong: quiz.wrong, ts: Date.now()
+      }));
+    } catch (e) {}
+  }
+  function loadQuizProgress(catId, examId) {
+    try {
+      var p = JSON.parse(localStorage.getItem(progressKey(catId, examId)) || "null");
+      if (!p) return null;
+      return p;
+    } catch (e) { return null; }
+  }
+  function clearQuizProgress(catId, examId) {
+    try { localStorage.removeItem(progressKey(catId, examId)); } catch (e) {}
+  }
+
   /* ---------- 渲染：选项 ---------- */
   function optHtml(q) {
     var cur = quiz.sel[q.id];
@@ -179,6 +223,55 @@
       return '<div class="' + cls + '" data-opt="' + oi + '"><span class="lk">' + lab +
         '</span><span class="lt">' + esc(o) + '</span></div>';
     }).join("");
+  }
+
+  // 局部更新：避免整题 innerHTML 重建导致的布局跳动
+  function paintOptions(q) {
+    var graded = !!quiz.graded[q.id];
+    var cur = quiz.sel[q.id];
+    var corr = correctIdx(q);
+    var isMulti = q.type === "multi";
+    var opts = appEl().querySelectorAll(".q .opt");
+    for (var i = 0; i < opts.length; i++) {
+      var el = opts[i];
+      var oi = parseInt(el.getAttribute("data-opt"), 10);
+      var selected = isMulti ? (cur && cur.indexOf(oi) >= 0) : (cur === oi);
+      var cls = "opt";
+      if (graded) {
+        if (corr.indexOf(oi) >= 0) cls += " ok";
+        else if (selected) cls += " no";
+      } else if (selected) {
+        cls += " on";
+      }
+      el.className = cls;
+    }
+  }
+  function showFeedback(q) {
+    var fb = appEl().querySelector(".q .fb");
+    if (quiz.graded[q.id]) {
+      var isCor = grade(q, quiz.sel[q.id]);
+      var html = '<div class="fb ' + (isCor ? "ok" : "no") + '">' + (isCor ? "回答正确" : "回答错误") +
+        ' · 正确答案：' + esc(answerText(q)) + '</div>';
+      if (fb) {
+        var tmp = document.createElement("div"); tmp.innerHTML = html;
+        fb.parentNode.replaceChild(tmp.firstChild, fb);
+      } else {
+        var acts = appEl().querySelector(".q .acts");
+        if (acts) acts.insertAdjacentHTML("beforebegin", html);
+      }
+    } else if (fb) { fb.parentNode.removeChild(fb); }
+  }
+  function renderActions(q) {
+    var acts = appEl().querySelector(".q .acts");
+    if (!acts) return;
+    var graded = !!quiz.graded[q.id];
+    var html = "";
+    if (graded) { html = '<button class="btn primary" data-act="next">下一题</button>'; }
+    else if (q.type === "multi") {
+      var has = quiz.sel[q.id] && quiz.sel[q.id].length > 0;
+      html = '<button class="btn primary" data-act="confirm"' + (has ? "" : ' disabled style="opacity:.45;cursor:not-allowed;"') + '>确认本题</button>';
+    } else { html = ''; }
+    acts.innerHTML = html;
   }
 
   /* ---------- 路由 ---------- */
@@ -241,15 +334,18 @@
       return '<div class="section-h">' + label + '</div><div class="chips">' +
         arr.map(function (x) { return '<span class="chip on">' + esc(x) + '</span>'; }).join("") + '</div>';
     };
+    var p = loadQuizProgress(cat.id, exam.id);
     var body;
     if (exam.quiz === false) {
       body = '<div class="q"><div class="qt">该考试以实操考核为主体，非纯笔试形态，本目录仅作信息列举。</div>' +
         (exam.note ? '<div class="hint">' + esc(exam.note) + '</div>' : '') + '</div>';
     } else {
-      body = '<div class="acts"><button class="btn primary" data-act="start-quiz" data-cat="' + cat.id +
-        '" data-exam="' + exam.id + '">开始刷题（' + (exam.questions ? exam.questions.length : 0) + ' 题）</button></div>' +
+      var qn = exam.questions ? exam.questions.length : 0;
+      body = (p ? '<div class="acts"><button class="btn" data-act="resume-quiz" data-cat="' + cat.id + '" data-exam="' + exam.id + '">继续上次（第 ' + Math.min(p.idx + 1, qn) + ' / ' + qn + ' 题）</button></div>' : '') +
+        '<div class="acts"><button class="btn primary" data-act="start-quiz" data-cat="' + cat.id +
+        '" data-exam="' + exam.id + '">' + (p ? "重新开始" : ("开始刷题（" + qn + ' 题）')) + '</button></div>' +
         '<div class="hint">当前用户「' + esc(curUser().name) + '」进度：已答 ' + prog.done + ' / 共 ' + prog.total +
-        '，掌握 ' + prog.cor + '。做题记录按用户保存在本地，预留后续接入账号系统。</div>';
+        '，掌握 ' + prog.cor + '。' + (p ? ' 已保存上次刷题进度，可「继续上次」或「重新开始」。' : '') + ' 做题记录按用户保存在本地，预留后续接入账号系统。</div>';
     }
     document.getElementById("app").innerHTML =
       '<p class="crumb"><a href="#">职业资格考试</a> / <a href="#/cat/' + cat.id + '">' + esc(cat.name) + '</a> / ' + esc(exam.name) + '</p>' +
@@ -283,6 +379,8 @@
       hint = '<div class="hint">点击选项即可自动判分</div>';
       actBtn = '';
     }
+    var readNote = (!speechOK) ? '<div class="hint">当前浏览器不支持语音朗读，可手动阅读题干。</div>'
+                  : (autoRead ? '<div class="hint">已开启自动朗读（移动端需先在页面内点击一次以解锁声音）。</div>' : '');
     document.getElementById("app").innerHTML =
       '<p class="crumb"><a href="#">职业资格考试</a> / <a href="#/cat/' + quiz.catId + '">' + esc(findCat(quiz.catId).name) +
         '</a> / <a href="#/exam/' + quiz.catId + '/' + quiz.examId + '">' + esc(findExam(findCat(quiz.catId), quiz.examId).name) + '</a></p>' +
@@ -290,14 +388,19 @@
         '<div class="score">答对 ' + quiz.correct + ' · 答错 ' + quiz.wrong + '</div></div>' +
       '<div class="prog"><div class="fill" style="width:' + (100 * (quiz.idx + 1) / total) + '%"></div></div>' +
       '<div class="q"><div class="qt">' + esc(q.q) + '</div>' +
-        '<button class="btn read' + (reading || autoFire ? " on" : "") + '" data-act="read"' + (synth ? "" : ' disabled style="opacity:.45;cursor:not-allowed;" title="当前浏览器不支持语音朗读"') + '>' + (reading || autoFire ? "⏹ 停止朗读" : "🔊 朗读题干") + '</button>' +
+        '<button class="btn read' + (reading || autoFire ? " on" : "") + '" data-act="read"' + (speechOK ? "" : ' disabled style="opacity:.45;cursor:not-allowed;" title="当前浏览器不支持语音朗读"') + '>' + (reading || autoFire ? "停止朗读" : "朗读题干") + '</button>' +
+        readNote +
         '<div class="opts">' + hint + optHtml(q) + '</div>' +
         (graded ? fb : '') +
         '<div class="acts">' + actBtn + '</div></div>';
-    if (autoFire) { lastReadId = q.id; reading = true; readAloud(q.q); }
+    if (autoFire) {
+      lastReadId = q.id; reading = true;
+      setTimeout(function () { readAloud(q.q); }, 80);
+    }
   }
 
   function renderSummary() {
+    clearQuizProgress(quiz.catId, quiz.examId);
     var total = quiz.list.length;
     var acc = total ? Math.round(100 * quiz.correct / total) : 0;
     document.getElementById("app").innerHTML =
@@ -331,6 +434,7 @@
     if (!t) return;
     e.preventDefault();
     try {
+      unlockSpeech();
       var _act0 = t.getAttribute("data-act");
       if (_act0 !== "read") { stopRead(); reading = false; }
       var optAttr = t.getAttribute("data-opt");
@@ -343,26 +447,43 @@
           var k = arr.indexOf(oi);
           if (k >= 0) arr.splice(k, 1); else arr.push(oi);
           quiz.sel[q.id] = arr;
+          var el = appEl().querySelector('.q .opt[data-opt="' + oi + '"]');
+          if (el) el.className = "opt" + (arr.indexOf(oi) >= 0 ? " on" : "");
+          renderActions(q);
         } else {
           quiz.sel[q.id] = oi;
           doGrade(q);
+          paintOptions(q); showFeedback(q); renderActions(q);
         }
-        render();
+        saveQuizProgress();
         return;
       }
       var act = t.getAttribute("data-act");
       if (act === "start-quiz") {
+        clearQuizProgress(t.getAttribute("data-cat"), t.getAttribute("data-exam"));
         startQuiz(t.getAttribute("data-cat"), t.getAttribute("data-exam"));
+      } else if (act === "resume-quiz") {
+        var rc = t.getAttribute("data-cat"), re = t.getAttribute("data-exam");
+        var rp = loadQuizProgress(rc, re); if (!rp) return;
+        startQuiz(rc, re);
+        quiz.idx = Math.min(rp.idx || 0, quiz.list.length - 1);
+        quiz.sel = rp.sel || {}; quiz.graded = rp.graded || {};
+        quiz.correct = rp.correct || 0; quiz.wrong = rp.wrong || 0;
+        quiz.summary = false;
+        render();
       } else if (act === "confirm") {
         var qc = quiz.list[quiz.idx];
         if (quiz.graded[qc.id]) return;
         if (!(quiz.sel[qc.id] && quiz.sel[qc.id].length > 0)) return;
-        doGrade(qc); render();
+        doGrade(qc); paintOptions(qc); showFeedback(qc); renderActions(qc);
+        saveQuizProgress();
       } else if (act === "next") {
         quiz.idx++;
         if (quiz.idx >= quiz.list.length) quiz.summary = true;
         render();
+        saveQuizProgress();
       } else if (act === "again") {
+        clearQuizProgress(quiz.catId, quiz.examId);
         quiz.idx = 0; quiz.sel = {}; quiz.graded = {}; quiz.correct = 0; quiz.wrong = 0; quiz.summary = false;
         render();
       } else if (act === "back") {
@@ -372,9 +493,8 @@
       } else if (act === "toggle-autoread") {
         autoRead = !autoRead; saveAutoRead(); render();
       } else if (act === "read") {
-        if (reading) { stopRead(); reading = false; }
-        else { readAloud(quiz.list[quiz.idx].q); reading = true; lastReadId = quiz.list[quiz.idx].id; }
-        render();
+        if (reading) { stopRead(); reading = false; renderReadBtn(); }
+        else { readAloud(quiz.list[quiz.idx].q); reading = true; lastReadId = quiz.list[quiz.idx].id; renderReadBtn(); }
       }
     } catch (err) {
       document.getElementById("app").innerHTML = '<div class="empty">交互出错：' + esc(String(err && err.message || err)) + '</div>';
