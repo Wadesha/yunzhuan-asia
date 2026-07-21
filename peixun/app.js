@@ -97,6 +97,15 @@
 
   /* ---------- 当前刷题会话 ---------- */
   var quiz = null;
+  // 将 catalog 中的 options 字符串（"A 文本|B 文本|..."）规范为纯文本数组，
+  // 字母下标由 letterOf(index) 提供，避免重复。兼容已经为数组的情况。
+  function parseOptions(raw) {
+    if (Array.isArray(raw)) return raw.map(function (o) { return typeof o === "string" ? o : (o.t != null ? o.t : o.k); });
+    return String(raw).split("|").map(function (s) {
+      var m = String(s).trim().match(/^[A-Za-z]\s*(.*)$/);
+      return m ? m[1] : s.trim();
+    });
+  }
   function startQuiz(catId, examId) {
     var cat = findCat(catId), exam = findExam(cat, examId);
     if (!exam || !exam.questions) return;
@@ -105,8 +114,10 @@
         id: "q" + i,
         type: q.t,
         q: q.q,
-        options: q.options,
-        answer: q.a,
+        options: parseOptions(q.options),
+        answer: q.t === "multi"
+          ? (Array.isArray(q.a) ? q.a : String(q.a).split("|").map(function (x) { return x.trim(); }))
+          : (Array.isArray(q.a) ? q.a[0] : q.a),
         qkey: catId + "/" + examId + "/" + i
       };
     });
