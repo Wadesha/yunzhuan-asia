@@ -146,6 +146,27 @@ a{color:inherit;text-decoration:none;}
   }
   function clearProgress(){ Srem(PROGRESS_KEY); }
 
+  // 累计做题历史（完成即落盘，供首页"最近一次"与历史页时间线）
+  var ATTEMPT_KEY = "peixun_jianhu_attempts_v1";
+  function loadAttempts(){ var a = Sget(ATTEMPT_KEY); return Array.isArray(a) ? a : []; }
+  function recordAttempt(){
+    try {
+      var total = state.list.length; if(!total) return;
+      var acc = Math.round(100 * state.correct / total);
+      var a = loadAttempts();
+      a.unshift({ ts: Date.now(), mode: state.shuffle ? "乱序" : "顺序", filter: state.filter,
+                  total: total, correct: state.correct, wrong: state.wrong, acc: acc });
+      if(a.length > 50) a.length = 50;
+      Sset(ATTEMPT_KEY, a);
+    } catch(e){}
+  }
+  function fmtDate(ts){ var d = new Date(ts); function p(n){ return (n<10?"0":"")+n; } return (d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes()); }
+  function recentHint(){
+    var a = loadAttempts(); if(!a.length) return "";
+    var r = a[0];
+    return '<p class="hint">最近一次：'+fmtDate(r.ts)+' · 答对 '+r.correct+'/'+r.total+'（'+r.acc+'%）</p>';
+  }
+
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
   function letterOf(i){ return String.fromCharCode(65+i); }
 
@@ -341,7 +362,8 @@ a{color:inherit;text-decoration:none;}
         '<button class="btn primary" data-act="start">'+(p?'重新开始':'开始刷题')+'</button>'+
         (wn? '<button class="btn ghost" data-act="wrong">重练错题（'+wn+'）</button>':'')+
       '</div>'+
-      (p? '<p class="hint">已为你保存上次进度，可「继续上次」或「重新开始」。</p>':'');
+      (p? '<p class="hint">已为你保存上次进度，可「继续上次」或「重新开始」。</p>':'')+
+      recentHint();
   }
 
   function renderQuiz(){
@@ -395,6 +417,7 @@ a{color:inherit;text-decoration:none;}
   }
 
   function renderSummary(){
+    recordAttempt();
     var app = document.getElementById("app");
     clearProgress();
     var total = state.list.length;
@@ -508,6 +531,8 @@ a{color:inherit;text-decoration:none;}
   }
   document.addEventListener("click", onClick);
   render();
+  // 供 PeixunAuth.init() 切换云端后端后重渲染（修复：登录用户刷新后从云端读回进度）
+  window.__peixunReRender = render;
 })();
 </script>
 <script src="../auth.js"></script>
