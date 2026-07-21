@@ -53,6 +53,12 @@ a{color:inherit;text-decoration:none;}
 .q{background:var(--paper);border:1px solid var(--line);padding:24px 26px;}
 .qt{font-size:17px;font-weight:600;line-height:1.6;margin-bottom:18px;}
 .hint{font-size:12px;color:var(--muted);margin-bottom:10px;letter-spacing:.5px;}
+.modnav{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 20px;}
+.modnav a{font-size:13.5px;color:var(--accent);border:1px solid var(--line);padding:7px 15px;letter-spacing:.5px;}
+.modnav a:hover{background:var(--accent);color:var(--paper);border-color:var(--accent);}
+.modnav .cur{font-size:13.5px;color:var(--muted);border:1px dashed var(--line);padding:7px 15px;}
+.notebox{background:var(--accent-bg);border:1px solid var(--line);padding:12px 16px;font-size:13px;color:var(--ink-soft);margin:0 0 22px;line-height:1.75;}
+.notebox b{color:var(--accent);font-weight:600;}
 .opts{display:flex;flex-direction:column;gap:10px;}
 .opt{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);
   background:var(--bg);cursor:pointer;}
@@ -198,6 +204,12 @@ a{color:inherit;text-decoration:none;}
     if(q.type==="multi") return q.answer.join("、");
     return q.answer;
   }
+  // 判分后朗读正确答案（与自动朗读题干相互独立）
+  function readAnswer(q){
+    if(!synth) return;
+    var isCor = grade(q, state.sel[q.id]);
+    readAloud((isCor ? "回答正确" : "回答错误") + "。正确答案：" + answerText(q));
+  }
 
   function doGrade(q){
     var qid = q.id;
@@ -304,6 +316,8 @@ a{color:inherit;text-decoration:none;}
     app.innerHTML =
       '<h1 class="page-title">监护培训考核 · 刷题</h1>'+
       '<p class="page-sub">题目来源：监护培训考核题库（单选/多选/判断 共 24 题）</p>'+
+      '<div class="modnav"><a href="../">刷题目录</a><a href="../wuxiandian/">业余无线电刷题</a><span class="cur">监护刷题</span></div>'+
+      '<div class="notebox">首页可切换 <b>题型</b> 与 <b>模式</b>；进度自动保存到本机，可「继续上次」。开启 <b>自动朗读</b> 后每题进入会朗读题干，<b>判分后会自动朗读正确答案</b>。</div>'+
       '<div class="section-h">题型</div><div class="chips">'+
         chip("all","全部")+chip("single","单选")+chip("multi","多选")+(TYPE_ZH.bool?chip("bool","判断"):'')+'</div>'+
       '<div class="section-h">模式</div><div class="chips">'+
@@ -343,7 +357,9 @@ a{color:inherit;text-decoration:none;}
       actBtn = '';
     }
     var readNote = (!speechOK) ? '<div class="hint">当前浏览器不支持语音朗读，可手动阅读题干。</div>'
-                  : (state.autoRead ? '<div class="hint">已开启自动朗读（移动端需先在页面内点击一次以解锁声音）。</div>' : '');
+                  : (state.autoRead
+                      ? '<div class="hint">已开启自动朗读（移动端需先点击一次解锁声音）；判分后会自动朗读正确答案。</div>'
+                      : '<div class="hint">判分后会自动朗读正确答案；可在首页开启「自动朗读」让每题先读题干。</div>');
     app.innerHTML =
       '<div class="bar"><div class="meta">第 '+(state.idx+1)+' / '+total+' 题 · '+TYPE_ZH[q.type]+'</div>'+
         '<div class="score">答对 '+state.correct+' · 答错 '+state.wrong+'</div></div>'+
@@ -358,7 +374,10 @@ a{color:inherit;text-decoration:none;}
     if(autoFire){
       state.lastReadId = q.id; state.reading = true;
       // 延迟触发，确保处于用户手势窗口内且 DOM 已绘制
-      setTimeout(function(){ readAloud(q.q); }, 80);
+      setTimeout(function(){
+        if(state.graded[q.id]) return; // 用户已在该题判分，改读答案，不再读题干
+        readAloud(q.q);
+      }, 80);
     }
   }
 
@@ -373,6 +392,7 @@ a{color:inherit;text-decoration:none;}
                '<div class="wa">正确答案：'+esc(answerText(q))+'</div></div>';
       }).join("");
     app.innerHTML =
+      '<div class="modnav"><a href="../">刷题目录</a><a href="../wuxiandian/">业余无线电刷题</a><span class="cur">监护刷题</span></div>'+
       '<div class="sum"><div class="big">'+acc+'%</div>'+
         '<div class="row"><span>共 <b>'+total+'</b> 题</span><span>答对 <b>'+state.correct+'</b></span>'+
           '<span>答错 <b>'+state.wrong+'</b></span></div>'+
@@ -424,6 +444,7 @@ a{color:inherit;text-decoration:none;}
           paintOptions(q);
           showFeedback(q);
           renderActions(q);
+          readAnswer(q);
         }
         saveProgress();
         return;
@@ -453,6 +474,7 @@ a{color:inherit;text-decoration:none;}
         if(!(state.sel[qc.id] && state.sel[qc.id].length>0)) return;
         doGrade(qc);
         paintOptions(qc); showFeedback(qc); renderActions(qc);
+        readAnswer(qc);
         saveProgress();
       }
       else if(act==="next"){
