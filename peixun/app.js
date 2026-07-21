@@ -281,7 +281,7 @@
       var has = quiz.sel[q.id] && quiz.sel[q.id].length > 0;
       html = '<button class="btn primary" data-act="confirm"' + (has ? "" : ' disabled style="opacity:.45;cursor:not-allowed;"') + '>确认本题</button>';
     } else { html = ''; }
-    acts.innerHTML = html;
+    acts.innerHTML = html + '<button class="btn ghost" data-act="exit">保存并退出</button>';
   }
 
   /* ---------- 路由 ---------- */
