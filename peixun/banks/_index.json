@@ -1,0 +1,230 @@
+{
+  "teacher": {
+    "cat": "edu",
+    "name": "教师资格"
+  },
+  "lawyer": {
+    "cat": "lawfin",
+    "name": "法律职业资格（司法考试）"
+  },
+  "cpa": {
+    "cat": "lawfin",
+    "name": "注册会计师"
+  },
+  "account": {
+    "cat": "lawfin",
+    "name": "会计专业技术资格（初/中/高级）"
+  },
+  "audit": {
+    "cat": "lawfin",
+    "name": "审计专业技术资格（初/中/高级）"
+  },
+  "stat": {
+    "cat": "lawfin",
+    "name": "统计专业技术资格（初/中/高级）"
+  },
+  "taxagent": {
+    "cat": "lawfin",
+    "name": "税务师"
+  },
+  "constructor": {
+    "cat": "eng",
+    "name": "建造师"
+  },
+  "supervisor": {
+    "cat": "eng",
+    "name": "监理工程师"
+  },
+  "costeng": {
+    "cat": "eng",
+    "name": "造价工程师"
+  },
+  "architect": {
+    "cat": "eng",
+    "name": "注册建筑师"
+  },
+  "kechai": {
+    "cat": "eng",
+    "name": "勘察设计注册工程师"
+  },
+  "urbanplanner": {
+    "cat": "eng",
+    "name": "注册城乡规划师"
+  },
+  "surveyor": {
+    "cat": "eng",
+    "name": "注册测绘师"
+  },
+  "safetyeng": {
+    "cat": "eng",
+    "name": "注册安全工程师（中级）"
+  },
+  "fireeng": {
+    "cat": "eng",
+    "name": "注册消防工程师（一/二级）"
+  },
+  "realestate": {
+    "cat": "eng",
+    "name": "房地产估价师"
+  },
+  "doctor": {
+    "cat": "med",
+    "name": "医师资格"
+  },
+  "nurse": {
+    "cat": "med",
+    "name": "护士执业资格"
+  },
+  "pharmacist": {
+    "cat": "med",
+    "name": "执业药师"
+  },
+  "healthtech": {
+    "cat": "med",
+    "name": "卫生专业技术资格（医/药/护/技 初中级）"
+  },
+  "software": {
+    "cat": "ict",
+    "name": "计算机技术与软件（初/中/高级）"
+  },
+  "catti": {
+    "cat": "ict",
+    "name": "翻译专业资格 CATTI（一/二/三级）"
+  },
+  "comm": {
+    "cat": "ict",
+    "name": "通信（初/中级）"
+  },
+  "publish": {
+    "cat": "ict",
+    "name": "出版（初/中级）"
+  },
+  "economy": {
+    "cat": "ict",
+    "name": "经济专业技术资格（初/中/高级）"
+  },
+  "consult": {
+    "cat": "ict",
+    "name": "咨询工程师（投资）"
+  },
+  "socialwork": {
+    "cat": "ict",
+    "name": "社会工作者（初/中/高级）"
+  },
+  "guide": {
+    "cat": "culture",
+    "name": "导游资格"
+  },
+  "journalist": {
+    "cat": "culture",
+    "name": "新闻记者职业资格"
+  },
+  "broadcaster": {
+    "cat": "culture",
+    "name": "广播电视播音员、主持人资格"
+  },
+  "broker": {
+    "cat": "culture",
+    "name": "演出经纪人员资格"
+  },
+  "banker": {
+    "cat": "culture",
+    "name": "银行业专业人员职业资格（初/中级）"
+  },
+  "appraiser": {
+    "cat": "culture",
+    "name": "资产评估师"
+  },
+  "patent": {
+    "cat": "culture",
+    "name": "专利代理师"
+  },
+  "nuclear": {
+    "cat": "culture",
+    "name": "注册核安全工程师"
+  },
+  "metrologist": {
+    "cat": "culture",
+    "name": "注册计量师（一/二级）"
+  },
+  "ship": {
+    "cat": "culture",
+    "name": "注册验船师"
+  },
+  "device": {
+    "cat": "culture",
+    "name": "注册设备监理师"
+  },
+  "eia": {
+    "cat": "culture",
+    "name": "环境影响评价工程师"
+  },
+  "welder": {
+    "cat": "skill",
+    "name": "焊工（民用核安全设备焊工、军用核安全设备焊接人员）"
+  },
+  "security": {
+    "cat": "skill",
+    "name": "安全保护服务人员（保安员、民航安全检查员）"
+  },
+  "firerescue": {
+    "cat": "skill",
+    "name": "消防和应急救援人员（消防员、森林消防员、应急救援员）"
+  },
+  "firefacility": {
+    "cat": "skill",
+    "name": "消防设施操作员"
+  },
+  "fitness": {
+    "cat": "skill",
+    "name": "健身娱乐场所人员（游泳救生员、社会体育指导员：游泳/滑雪/潜水/攀岩）"
+  },
+  "cabin": {
+    "cat": "skill",
+    "name": "民航乘务员、机场运行指挥员"
+  },
+  "train": {
+    "cat": "skill",
+    "name": "轨道列车司机"
+  },
+  "hazmat": {
+    "cat": "skill",
+    "name": "危险货物、化学品运输从业人员"
+  },
+  "road": {
+    "cat": "skill",
+    "name": "道路运输从业人员（客货运驾驶员、出租车驾驶员）"
+  },
+  "special": {
+    "cat": "skill",
+    "name": "特种作业人员（电工/焊接与热切割/高处作业等，应急管理部门）"
+  },
+  "buildspecial": {
+    "cat": "skill",
+    "name": "建筑施工特种作业人员（住建部门）"
+  },
+  "boiler": {
+    "cat": "skill",
+    "name": "特种设备安全管理和作业人员（叉车/起重/锅炉/压力容器等，市场监管部门）"
+  },
+  "livestock": {
+    "cat": "skill",
+    "name": "家畜繁殖员"
+  },
+  "securities": {
+    "cat": "finsec",
+    "name": "证券从业资格考试"
+  },
+  "fund": {
+    "cat": "finsec",
+    "name": "基金从业资格考试"
+  },
+  "futures": {
+    "cat": "finsec",
+    "name": "期货从业资格考试"
+  },
+  "actuary": {
+    "cat": "finsec",
+    "name": "中国精算师（准精算师）"
+  }
+}
