@@ -153,6 +153,28 @@
 
   /* ---------- 当前刷题会话 ---------- */
   var quiz = null;
+
+  /* ---------- 主观题阅读卡（例题+参考答案，不计分、可收藏） ---------- */
+  var readState = null;
+  var READ_FAV_KEY = "peixun_reads_fav_v1";
+  function loadReadFavs() { var a = Sget(READ_FAV_KEY); return Array.isArray(a) ? a : []; }
+  function toggleReadFav(key) { var a = loadReadFavs(); var i = a.indexOf(key); if (i >= 0) a.splice(i, 1); else a.push(key); Sset(READ_FAV_KEY, a); }
+  function countReads(exam) {
+    var n = 0;
+    if (exam.reads) n += exam.reads.length;
+    if (exam.sub) exam.sub.forEach(function (s) { if (s.reads) n += s.reads.length; });
+    return n;
+  }
+  function gatherReads(cat, exam, subId) {
+    var list = [];
+    function pushFrom(arr, ctx) { (arr || []).forEach(function (r, i) { list.push({ q: r.q, a: r.a, e: r.e || null, key: ctx + "/" + i }); }); }
+    if (subId) { var s = findSub(exam, subId); if (s) pushFrom(s.reads, cat.id + "/" + exam.id + "/" + s.id); }
+    else {
+      pushFrom(exam.reads, cat.id + "/" + exam.id);
+      if (exam.sub) exam.sub.forEach(function (s) { pushFrom(s.reads, cat.id + "/" + exam.id + "/" + s.id); });
+    }
+    return list;
+  }
   // 将 catalog 中的 options 字符串（"A 文本|B 文本|..."）规范为纯文本数组，
   // 字母下标由 letterOf(index) 提供，避免重复。兼容已经为数组的情况。
   function parseOptions(raw) {
@@ -312,7 +334,42 @@
     var parts = h.split("/").filter(Boolean);
     if (parts[0] === "cat" && parts[1]) return { view: "cat", catId: parts[1] };
     if (parts[0] === "exam" && parts[1] && parts[2]) return { view: "exam", catId: parts[1], examId: parts[2] };
+    if (parts[0] === "read" && parts[1] && parts[2]) return { view: "read", catId: parts[1], examId: parts[2], subId: parts[3] || null };
     return { view: "home" };
+  }
+
+  function renderRead(route) {
+    var cat = findCat(route.catId), exam = findExam(cat, route.examId);
+    if (!exam) { location.hash = "#/cat/" + route.catId; return; }
+    var list = gatherReads(cat, exam, route.subId);
+    if (!list.length) { location.hash = "#/exam/" + route.catId + "/" + route.examId; return; }
+    var idx = readState && readState.catId === route.catId && readState.examId === route.examId && readState.subId === (route.subId || null)
+      ? Math.min(readState.idx, list.length - 1) : 0;
+    readState = { catId: route.catId, examId: route.examId, subId: route.subId || null, list: list, idx: idx };
+    var card = list[idx];
+    var favs = loadReadFavs();
+    var faved = favs.indexOf(card.key) >= 0;
+    var subName = route.subId && findSub(exam, route.subId) ? findSub(exam, route.subId).name : "";
+    var title = exam.name + (subName ? " · " + subName : "");
+    document.getElementById("app").innerHTML =
+      '<p class="crumb"><a href="#">职业资格考试</a> / <a href="#/cat/' + cat.id + '">' + esc(cat.name) + '</a> / <a href="#/exam/' + cat.id + '/' + exam.id + '">' + esc(exam.name) + '</a> / 阅读卡</p>' +
+      '<div class="modnav"><a href="#/exam/' + cat.id + '/' + exam.id + '">返回考试</a></div>' +
+      '<h1 class="page-title">主观题 / 例题 参考答案</h1>' +
+      '<p class="page-sub">' + esc(title) + ' · 第 ' + (idx + 1) + ' / ' + list.length + ' 张（不计分，供背诵与对照）</p>' +
+      '<div class="q read-card"><div class="qt">' + esc(card.q) + '</div>' +
+        '<div class="acts">' +
+          '<button class="btn" data-act="show-ans">显示参考答案</button>' +
+          '<button class="btn ghost' + (faved ? ' fav' : '') + '" data-act="fav-read">' + (faved ? '已收藏' : '收藏') + '</button>' +
+        '</div>' +
+        '<div class="ans" data-ans style="display:none;">' +
+          '<div class="ans-h">参考答案</div><div class="ans-b">' + esc(card.a).replace(/\n/g, '<br>') + '</div>' +
+          (card.e ? '<div class="exp"><span class="exp-h">解析 / 考点</span>' + esc(String(card.e).replace(/^考点[：:]\s*/, '')) + '</div>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="acts">' +
+        (idx > 0 ? '<button class="btn" data-act="prev-read">上一张</button>' : '') +
+        (idx < list.length - 1 ? '<button class="btn primary" data-act="next-read">下一张</button>' : '<button class="btn primary" data-act="read-done">完成</button>') +
+      '</div>';
   }
 
   function renderHome() {
@@ -418,7 +475,8 @@
       (exam.sub && exam.sub.length ? "" : chip(exam.subjects, "主要科目")) +
       (exam.quiz === false ? "" : '<div class="section-h">朗读</div><div class="chips"><span class="chip' + (autoRead ? " on" : "") + '" data-act="toggle-autoread">自动朗读题干：' + (autoRead ? "开" : "关") + '</span></div>') +
       body +
-      (exam.quiz === false ? "" : '<div class="hint">进度：已答 ' + prog.done + ' / 共 ' + prog.total + '，掌握 ' + prog.cor + '。' + (exam.sub && exam.sub.length ? ' 分科进度各自保存。' : (p ? ' 已保存上次刷题进度，可「继续上次」或「重新开始」。' : '')) + ' 做题记录随登录的云端账号同步。</div>');
+      (exam.quiz === false ? "" : '<div class="hint">进度：已答 ' + prog.done + ' / 共 ' + prog.total + '，掌握 ' + prog.cor + '。' + (exam.sub && exam.sub.length ? ' 分科进度各自保存。' : (p ? ' 已保存上次刷题进度，可「继续上次」或「重新开始」。' : '')) + ' 做题记录随登录的云端账号同步。</div>') +
+      (countReads(exam) ? '<div class="section-h">主观题 / 例题</div><div class="acts"><a class="btn" href="#/read/' + cat.id + '/' + exam.id + '">📖 阅读参考答案（' + countReads(exam) + ' 张）</a></div>' : '');
   }
 
   function renderQuiz() {
@@ -482,6 +540,7 @@
 
   function render() {
     var route = parseHash();
+    if (route.view === "read") { renderRead(route); return; }
     // 若正在该考试刷题，且路由仍在该考试，则渲染题目/总结
     if (quiz && route.view === "exam" && route.catId === quiz.catId && route.examId === quiz.examId) {
       if (quiz.summary) { renderSummary(); return; }
@@ -559,6 +618,22 @@
         quiz = null; render();
       } else if (act === "toggle-autoread") {
         autoRead = !autoRead; saveAutoRead(); render();
+      } else if (act === "show-ans") {
+        var ans = appEl().querySelector("[data-ans]");
+        if (ans) ans.style.display = (ans.style.display === "none") ? "" : "none";
+      } else if (act === "fav-read") {
+        if (!readState) return;
+        var ck = readState.list[readState.idx].key;
+        toggleReadFav(ck);
+        var favs2 = loadReadFavs();
+        t.className = "btn ghost" + (favs2.indexOf(ck) >= 0 ? " fav" : "");
+        t.textContent = favs2.indexOf(ck) >= 0 ? "已收藏" : "收藏";
+      } else if (act === "next-read") {
+        if (readState) { readState.idx = Math.min(readState.idx + 1, readState.list.length - 1); render(); }
+      } else if (act === "prev-read") {
+        if (readState) { readState.idx = Math.max(readState.idx - 1, 0); render(); }
+      } else if (act === "read-done") {
+        location.hash = "#/exam/" + (readState ? readState.catId : "") + "/" + (readState ? readState.examId : "");
       } else if (act === "read") {
         if (reading) { stopRead(); reading = false; renderReadBtn(); }
         else { readAloud(quiz.list[quiz.idx].q); reading = true; lastReadId = quiz.list[quiz.idx].id; renderReadBtn(); }
