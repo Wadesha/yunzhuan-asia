@@ -1,49 +1,43 @@
-/* peixun 考试目录 SPA 引擎：哈希路由 + 点击即判分 + 按用户命名空间的做题进度
-   数据来自 catalog.js（window.EXAMS）。做题记录存 localStorage，按用户隔离，
-   数据模型预留后续接入后端账号系统（将 users 存到服务端即可）。 */
+/* peixun 考试目录 SPA 引擎：哈希路由 + 点击即判分 + 做题进度
+   数据来自 catalog.js（window.EXAMS）。做题记录经 store.js 抽象层持久化：
+   登录云端账号（手机号）后随账号同步，未登录则仅存本机 localStorage。 */
 (function () {
   "use strict";
   var EXAMS = window.EXAMS || [];
 
-  /* ---------- 用户做题信息（预留后端对接） ---------- */
-  var USERS_KEY = "peixun_users_v1";
-  function loadUsers() {
-    try { return JSON.parse(localStorage.getItem(USERS_KEY) || "null"); } catch (e) { return null; }
+  /* ---------- 做题统计（随账号系统同步，无本地多用户切换） ---------- */
+  function statsKey() { return "peixun_stats_v1"; }
+  function loadStats() {
+    var s = Sget(statsKey());
+    return (s && s.stats) ? s.stats : {};
   }
-  function saveUsers(u) {
-    try { localStorage.setItem(USERS_KEY, JSON.stringify(u)); } catch (e) {}
-  }
-  var users = loadUsers();
-  if (!users || !users.users) users = { users: {}, current: null };
-  if (!users.current || !users.users[users.current]) {
-    var def = "u_demo";
-    users.users[def] = { name: "演示用户", stats: {} };
-    users.current = def;
-    saveUsers(users);
-  }
-  function curUser() { return users.users[users.current]; }
-  function switchUser() {
-    var name = window.prompt("输入用户名（新建或切换，本地演示）：", curUser().name);
-    if (!name) return;
-    var uid = null;
-    for (var k in users.users) { if (users.users[k].name === name) { uid = k; break; } }
-    if (!uid) { uid = "u_" + Date.now(); users.users[uid] = { name: name, stats: {} }; }
-    users.current = uid;
-    saveUsers(users);
-    render();
-  }
+  function saveStats(st) { Sset(statsKey(), { stats: st }); }
   function record(qkey, ok) {
-    var u = curUser();
-    var st = u.stats[qkey] || { c: 0, w: 0 };
-    if (ok) st.c++; else st.w++;
-    u.stats[qkey] = st;
-    saveUsers(users);
+    var st = loadStats();
+    var e = st[qkey] || { c: 0, w: 0 };
+    if (ok) e.c++; else e.w++;
+    st[qkey] = e;
+    saveStats(st);
+  }
+  // 累计做题历史（每场考试完成即落盘，供历史页时间线聚合）
+  var ATTEMPT_KEY = "peixun_spa_attempts_v1";
+  function recordAttempt() {
+    try {
+      if (!quiz) return;
+      var total = quiz.list.length; if (!total) return;
+      var acc = Math.round(100 * quiz.correct / total);
+      var a = Sget(ATTEMPT_KEY); if (!Array.isArray(a)) a = [];
+      a.unshift({ ts: Date.now(), catId: quiz.catId, examId: quiz.examId,
+                  total: total, correct: quiz.correct, wrong: quiz.wrong, acc: acc });
+      if (a.length > 50) a.length = 50;
+      Sset(ATTEMPT_KEY, a);
+    } catch (e) {}
   }
   function userProgress(qkeys) {
-    var u = curUser(), done = 0, cor = 0;
+    var st = loadStats(), done = 0, cor = 0;
     qkeys.forEach(function (k) {
-      var st = u.stats[k];
-      if (st && (st.c + st.w) > 0) { done++; if (st.c >= st.w && st.c > 0) cor++; }
+      var e = st[k];
+      if (e && (e.c + e.w) > 0) { done++; if (e.c >= e.w && e.c > 0) cor++; }
     });
     return { done: done, total: qkeys.length, cor: cor };
   }
@@ -198,7 +192,7 @@
   function Sset(k,v){ if(window.Store) return window.Store.set(k,v); try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
   function Srem(k){ if(window.Store) return window.Store.remove(k); try { localStorage.removeItem(k); } catch(e){} }
   function progressKey(catId, examId) {
-    return "peixun_quiz_v1_" + users.current + "_" + catId + "_" + examId;
+    return "peixun_quiz_v1_" + catId + "_" + examId;
   }
   function saveQuizProgress() {
     try {
@@ -314,7 +308,7 @@
       '<h1 class="page-title">职业资格考试 · 刷题目录</h1>' +
       '<p class="page-sub">国家职业资格考试（笔试形态）目录 + 技能人员职业资格信息。点击分类进入，选择考试即可刷题。' +
       '每考试附少量贴合其真实科目范围的演示题（非官方真题，仅供参考）。</p>' +
-      '<div class="notebox">本目录为各职业资格考试（笔试形态）的演示题库，题目依据公开科目范围编写，<b>非官方真题</b>，仅供参考。进入考试后可刷题，<b>判分后会自动朗读正确答案</b>；做题记录按用户保存在本机。下方为既有的独立刷题模块。</div>' +
+      '<div class="notebox">本目录为各职业资格考试（笔试形态）的演示题库，题目依据公开科目范围编写，<b>非官方真题</b>，仅供参考。进入考试后可刷题，<b>判分后会自动朗读正确答案</b>；做题记录登录云端账号后随手机同步，未登录则仅存本机。下方为既有的独立刷题模块。</div>' +
       '<div class="modnav"><span class="cur">刷题目录</span><a href="jianhu/">监护刷题</a><a href="wuxiandian/">业余无线电刷题</a></div>' +
       '<div class="cards">' + cats + '</div>' +
       '<div class="section-h">其他刷题模块（既有）</div>' +
@@ -364,15 +358,15 @@
       body = (p ? '<div class="acts"><button class="btn" data-act="resume-quiz" data-cat="' + cat.id + '" data-exam="' + exam.id + '">继续上次（第 ' + Math.min(p.idx + 1, qn) + ' / ' + qn + ' 题）</button></div>' : '') +
         '<div class="acts"><button class="btn primary" data-act="start-quiz" data-cat="' + cat.id +
         '" data-exam="' + exam.id + '">' + (p ? "重新开始" : ("开始刷题（" + qn + ' 题）')) + '</button></div>' +
-        '<div class="hint">当前用户「' + esc(curUser().name) + '」进度：已答 ' + prog.done + ' / 共 ' + prog.total +
-        '，掌握 ' + prog.cor + '。' + (p ? ' 已保存上次刷题进度，可「继续上次」或「重新开始」。' : '') + ' 做题记录按用户保存在本地，预留后续接入账号系统。</div>';
+        '<div class="hint">进度：已答 ' + prog.done + ' / 共 ' + prog.total +
+        '，掌握 ' + prog.cor + '。' + (p ? ' 已保存上次刷题进度，可「继续上次」或「重新开始」。' : '') + ' 做题记录随登录的云端账号同步。</div>';
     }
     document.getElementById("app").innerHTML =
       '<p class="crumb"><a href="#">职业资格考试</a> / <a href="#/cat/' + cat.id + '">' + esc(cat.name) + '</a> / ' + esc(exam.name) + '</p>' +
       '<div class="modnav"><a href="#">刷题目录</a><a href="jianhu/">监护刷题</a><a href="wuxiandian/">业余无线电刷题</a></div>' +
       '<h1 class="page-title">' + esc(exam.name) + '</h1>' +
       '<p class="page-sub">组织：' + esc(exam.body || "—") + (exam.site ? ' · 官网：' + esc(exam.site) : '') + '</p>' +
-      '<div class="notebox">开始刷题后 <b>判分会自动朗读正确答案</b>；做题记录按当前用户保存在本机（可在右上角切换用户）。进度支持「继续上次」。</div>' +
+      '<div class="notebox">开始刷题后 <b>判分会自动朗读正确答案</b>；做题记录在<b>登录云端账号后随手机同步</b>（未登录则仅存本机）。进度支持「继续上次」。</div>' +
       chip(exam.levels, "层级 / 阶段") +
       chip(exam.subjects, "主要科目") +
       (exam.quiz === false ? "" : '<div class="section-h">朗读</div><div class="chips"><span class="chip' + (autoRead ? " on" : "") + '" data-act="toggle-autoread">自动朗读题干：' + (autoRead ? "开" : "关") + '</span></div>') +
@@ -424,6 +418,7 @@
   }
 
   function renderSummary() {
+    recordAttempt();
     clearQuizProgress(quiz.catId, quiz.examId);
     var total = quiz.list.length;
     var acc = total ? Math.round(100 * quiz.correct / total) : 0;
@@ -449,7 +444,6 @@
     if (route.view === "exam") { renderExamDetail(route); return; }
     if (route.view === "cat") { renderCat(route); return; }
     renderHome();
-    updateUserBadge();
   }
 
   /* ---------- 交互 ---------- */
@@ -514,8 +508,6 @@
         render();
       } else if (act === "back") {
         quiz = null; render();
-      } else if (act === "switch-user") {
-        switchUser();
       } else if (act === "toggle-autoread") {
         autoRead = !autoRead; saveAutoRead(); render();
       } else if (act === "read") {
@@ -527,12 +519,9 @@
     }
   }
 
-  function updateUserBadge() {
-    var el = document.getElementById("userBadge");
-    if (el) el.textContent = "当前用户：" + curUser().name;
-  }
-
   document.addEventListener("click", onClick);
   window.addEventListener("hashchange", function () { render(); });
   render();
+  // 供 PeixunAuth.init() 切换云端后端后重渲染（修复：登录用户刷新后从云端读回进度）
+  window.__peixunReRender = render;
 })();
