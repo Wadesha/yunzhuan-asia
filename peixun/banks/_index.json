@@ -226,5 +226,17 @@
   "actuary": {
     "cat": "finsec",
     "name": "中国精算师（准精算师）"
+  },
+  "civil": {
+    "cat": "gov",
+    "name": "公务员录用考试"
+  },
+  "institution": {
+    "cat": "gov",
+    "name": "事业单位公开招聘"
+  },
+  "teacherrec": {
+    "cat": "gov",
+    "name": "教师招聘考试"
   }
 }
