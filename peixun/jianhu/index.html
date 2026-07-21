@@ -239,7 +239,7 @@ a{color:inherit;text-decoration:none;}
     if(graded){
       actBtn = '<button class="btn primary" data-act="next">下一题</button>';
     } else if(q.type==="multi"){
-      hint = '<div class="hint">本题为多选，可勾选多个选项；集合完全匹配即自动判对，选中错误项即判错</div>';
+      hint = '<div class="hint">本题为多选，勾选多个选项后点「确认本题」判分</div>';
       var has = state.sel[q.id] && state.sel[q.id].length>0;
       actBtn = '<button class="btn primary" data-act="confirm"'+((has)?"":" disabled style=\"opacity:.45;cursor:not-allowed;\"")+'>确认本题</button>';
     } else {
@@ -308,8 +308,6 @@ a{color:inherit;text-decoration:none;}
           var k = arr.indexOf(oi);
           if(k>=0) arr.splice(k,1); else arr.push(oi);
           state.sel[q.id] = arr;
-          if(matchSet(q, arr)) doGrade(q);
-          else if(arr.some(function(i){ return q.answer.indexOf(letterOf(i))<0; })) doGrade(q);
         } else {
           state.sel[q.id] = oi;
           doGrade(q);
