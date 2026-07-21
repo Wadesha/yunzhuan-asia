@@ -42,6 +42,12 @@ function normalize(q) {
   };
 }
 function optLetters(opts) { return opts.map((_, i) => letterOf(i)); }
+function flatQuestions(bank) {
+  if (Array.isArray(bank)) return bank;
+  if (bank && Array.isArray(bank.sub)) return [].concat.apply([], bank.sub.map(s => s.questions || []));
+  if (bank && Array.isArray(bank.questions)) return bank.questions;
+  return [];
+}
 
 const banks = fs.readdirSync(BANKS)
   .filter(f => f.endsWith(".json") && f !== "_base.json" && f !== "_index.json")
@@ -50,7 +56,7 @@ const banks = fs.readdirSync(BANKS)
 let pass = 0, fail = 0, totalQ = 0;
 const fails = [];
 for (const id of banks) {
-  const arr = JSON.parse(fs.readFileSync(path.join(BANKS, id + ".json"), "utf8"));
+  const arr = flatQuestions(JSON.parse(fs.readFileSync(path.join(BANKS, id + ".json"), "utf8")));
   arr.forEach((q, i) => {
     totalQ++;
     const n = normalize(q);
