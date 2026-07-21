@@ -86,6 +86,12 @@ a{color:inherit;text-decoration:none;}
 .exp{margin-top:10px;padding:12px 14px;background:var(--accent-bg);border:1px solid var(--line);
   border-left:3px solid var(--accent-2);font-size:13.5px;line-height:1.7;color:var(--ink-soft);}
 .exp .exp-h{display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--accent-2);margin-bottom:5px;font-weight:600;}
+/* 主观题阅读卡（例题+参考答案，不计分） */
+.read-card{border-left:3px solid #b08d57 !important;}
+.ans{margin-top:14px;padding:14px 16px;background:#fbf7ef;border:1px solid #ecdfc6;border-radius:8px;}
+.ans-h{display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#a07a3c;margin-bottom:6px;font-weight:600;}
+.ans-b{font-size:14px;line-height:1.8;color:var(--ink);white-space:normal;}
+.btn.ghost.fav{background:var(--ok-bg);color:var(--ok);border-color:#cfe3d4;}
 .sum{background:var(--paper);border:1px solid var(--line);padding:26px;}
 .sum .big{font-size:34px;font-weight:700;font-family:Georgia,serif;color:var(--accent);}
 .sum .row{display:flex;gap:24px;flex-wrap:wrap;margin:14px 0 6px;color:var(--ink-soft);}
@@ -131,12 +137,12 @@ a{color:inherit;text-decoration:none;}
 </div></footer>
 
 <!-- ?v= 为 CDN 缓存破坏版本号：每次推送题库/前端改动后递增，绕过 Vercel 对静态文件的滚动滞后 -->
-<script src="catalog.js?v=20260722c"></script>
-<script src="store.js?v=20260722c"></script>
+<script src="catalog.js?v=20260722d"></script>
+<script src="store.js?v=20260722d"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="store.supabase.js?v=20260722c"></script>
-<script src="app.js?v=20260722c"></script>
-<script src="auth.js?v=20260722c"></script>
+<script src="store.supabase.js?v=20260722d"></script>
+<script src="app.js?v=20260722d"></script>
+<script src="auth.js?v=20260722d"></script>
 <script>if(window.PeixunAuth&&window.SupabaseBackend)PeixunAuth.init();</script>
 </body>
 </html>
