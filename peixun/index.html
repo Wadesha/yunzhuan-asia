@@ -91,6 +91,11 @@ a{color:inherit;text-decoration:none;}
 .foot{border-top:1px solid var(--line);background:var(--paper);color:var(--muted);font-size:12.5px;letter-spacing:.5px;}
 .foot .shell{padding:22px 24px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;}
 @media(max-width:560px){.wrap{padding:22px 16px 50px;}.q{padding:18px 16px;}}
+.footnav{display:flex;flex-wrap:wrap;gap:10px 20px;margin:0 0 10px;}
+.footnav a{color:#2b6cb0;text-decoration:none;font-size:13.5px;font-weight:500;}
+.footnav a:hover{text-decoration:underline;}
+.foot .shell{flex-direction:column;align-items:flex-start;}
+.foot-tip{font-size:12px;color:#9aa7b0;}
 </style>
 </head>
 <body>
@@ -100,8 +105,13 @@ a{color:inherit;text-decoration:none;}
 </div></header>
 <main class="wrap"><div id="app"></div></main>
 <footer class="foot"><div class="shell">
-  <span>职业资格考试刷题目录 · 演示题依据各考试公开科目范围编写，非官方真题</span>
-  <span>题目来源见各考试官方官网（cpta.com.cn 等）</span>
+  <nav class="footnav">
+    <a href="jianhu/index.html">监护培训考核</a>
+    <a href="wuxiandian/index.html">业余无线电</a>
+    <a href="history.html">做题历史</a>
+    <a href="../">云篆官网</a>
+  </nav>
+  <span class="foot-tip">职业资格考试刷题目录 · 演示题依据各考试公开科目范围编写，非官方真题 · 题目来源见各考试官方官网</span>
 </div></footer>
 
 <script src="catalog.js"></script>
