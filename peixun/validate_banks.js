@@ -3,7 +3,13 @@ const fs = require("fs");
 const path = require("path");
 const BANKS = path.join(__dirname, "banks");
 
-let errors = 0, total = 0;
+let errors = 0, total = 0, totalReads = 0;
+function collectReads(bank) {
+  let reads = [];
+  if (bank && Array.isArray(bank.sub)) bank.sub.forEach(s => { if (Array.isArray(s.reads)) reads = reads.concat(s.reads); });
+  else if (bank && Array.isArray(bank.reads)) reads = bank.reads;
+  return reads;
+}
 for (const f of fs.readdirSync(BANKS)) {
   if (!f.endsWith(".json") || f === "_base.json" || f === "_index.json") continue;
   const id = f.replace(/\.json$/, "");
@@ -33,7 +39,15 @@ for (const f of fs.readdirSync(BANKS)) {
       for (const x of q.a) if (!letters.includes(x)) { console.log(`✗ ${tag}: 答案项 ${x} 不在选项 ${letters.join(",")}`); errors++; }
     }
   });
-  console.log(`  ${id}: ${arr.length} 题校验通过`);
+  // 阅读卡（主观题例题+参考答案）校验：q/a 必填，e 可选
+  const reads = collectReads(bank);
+  reads.forEach((r, i) => {
+    totalReads++;
+    const tag = `${id}.read[${i}]`;
+    if (!r.q || typeof r.q !== "string") { console.log(`✗ ${tag}: 阅读卡题干缺失`); errors++; }
+    if (!r.a || typeof r.a !== "string") { console.log(`✗ ${tag}: 阅读卡参考答案缺失`); errors++; }
+  });
+  console.log(`  ${id}: ${arr.length} 题校验通过` + (reads.length ? ` · ${reads.length} 阅读卡` : ""));
 }
-console.log(`\n总计 ${total} 题，发现 ${errors} 处问题`);
+console.log(`\n总计 ${total} 客观题 + ${totalReads} 阅读卡，发现 ${errors} 处问题`);
 process.exit(errors ? 1 : 0);
