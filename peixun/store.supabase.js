@@ -76,17 +76,20 @@
 
   SupabaseBackend.prototype.set = function (k, v) {
     this._cache[k] = v;
-    this._rpc("kv_slot_set", {
+    // 后台回写云端；构造器是 thenable，须 Promise.resolve 后才能 .catch
+    var p = this._rpc("kv_slot_set", {
       p_slot_id: this._slotId, p_slot_secret: this._slotSecret, p_key: k, p_value: v
-    }).catch(function () {});                       // 后台回写，吞掉错误
+    });
+    Promise.resolve(p).catch(function () {});
     return true;
   };
 
   SupabaseBackend.prototype.remove = function (k) {
     delete this._cache[k];
-    this._rpc("kv_slot_del", {
+    var p = this._rpc("kv_slot_del", {
       p_slot_id: this._slotId, p_slot_secret: this._slotSecret, p_key: k
-    }).catch(function () {});
+    });
+    Promise.resolve(p).catch(function () {});
     return true;
   };
 
