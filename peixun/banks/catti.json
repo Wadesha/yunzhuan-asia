@@ -1,0 +1,146 @@
+[
+  {
+    "t": "single",
+    "q": "He was _____ by his colleagues for his careless mistake. （他被同事责备）",
+    "options": "A rebuked|B condemned|C clenched|D endorsed",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "The committee _____ the new policy. （委员会批准了新政策）",
+    "options": "A rejected|B endorsed|C redeemed|D clenched",
+    "a": "B"
+  },
+  {
+    "t": "single",
+    "q": "'错综复杂'的英文翻译是？",
+    "options": "A complex|B simple|C clear|D brief",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "'一蹴而就'可译为？",
+    "options": "A achieve overnight|B achieve gradually|C give up|D take time",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "'与时俱进'的英文是？",
+    "options": "A Keep pace with the times|B go back to the past|C stand still|D fall behind",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "'经济全球化'译为？",
+    "options": "A Economic globalization|B political reform|C cultural exchange|D technological progress",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "'可持续发展'译为？",
+    "options": "A Sustainable development|B fast growth|C economic expansion|D industrial progress",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "'以人为本'译为？",
+    "options": "A People centered|B economy first|C profit oriented|D state centered",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "'循环经济'译为？",
+    "options": "A Circular economy|B linear economy|C market economy|D planned economy",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "'贸易顺差'译为？",
+    "options": "A Trade surplus|B trade deficit|C trade balance|D trade war",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "'知识产权'译为？",
+    "options": "A intellectual property|B physical property|C public property|D private property",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "The leaders _____ to work together for peace. （领导人承诺合作）",
+    "options": "A pledged|B redeemed|C condemned|D clenched",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "He _____ his promise by returning the money. （他兑现了承诺）",
+    "options": "A redeemed|B condemned|C clenched|D endorsed",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "She _____ her fists in anger. （她愤怒地握紧拳头）",
+    "options": "A clenched|B condemned|C endorsed|D redeemed",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "The movie was widely _____ for its violence. （影片因暴力广受谴责）",
+    "options": "A condemned|B endorsed|C clenched|D redeemed",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "'改革开放'译为？",
+    "options": "A Reform and opening up|B closing down|C isolation|D restriction",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "'全面建成小康社会'译为？",
+    "options": "A build a moderately prosperous society in all respects|B eliminate poverty only|C urbanize fully|D industrialize",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "'一带一路'倡议译为？",
+    "options": "A the Belt and Road Initiative|B one road one belt|C the silk road fund|D the trade zone",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "'中华民族伟大复兴'译为？",
+    "options": "A the great rejuvenation of the Chinese nation|B Chinese expansion|C cultural revival only|D national wealth",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "'供给侧结构性改革'译为？",
+    "options": "A supply-side structural reform|B demand-side reform|C fiscal reform|D financial reform",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "The report _____ the importance of education. （报告强调了教育的重要性）",
+    "options": "A underlined|B clenched|C redeemed|D condemned",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "'基础设施'译为？",
+    "options": "A infrastructure|B superstructure|C structure|D construction",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "'脱贫攻坚'译为？",
+    "options": "A poverty alleviation|B poverty increase|C wealth concentration|D urban expansion",
+    "a": "A"
+  },
+  {
+    "t": "single",
+    "q": "'高质量发展'译为？",
+    "options": "A high-quality development|B high-speed growth|C low-quality expansion|D rough development",
+    "a": "A"
+  }
+]
