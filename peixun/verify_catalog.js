@@ -42,7 +42,7 @@ function normalize(q) {
 }
 function optLetters(opts) { return opts.map((_, i) => letterOf(i)); }
 
-const ids = ["lawyer", "cpa", "account", "audit", "stat", "taxagent"];
+const ids = ["lawyer", "cpa", "account", "audit", "stat", "taxagent", "doctor", "nurse", "pharmacist", "healthtech"];
 let pass = 0, fail = 0;
 const fails = [];
 for (const id of ids) {
@@ -72,4 +72,4 @@ for (const id of ids) {
 }
 console.log(`\n判分校验：通过 ${pass} / 失败 ${fail}`);
 if (fail) { console.log("失败项："); fails.forEach(f => console.log("  " + f)); process.exit(1); }
-console.log("✓ 全部 lawfin 真实题目判分链路正确");
+console.log("✓ 全部真实题目判分链路正确（lawfin + 医药卫生 共 10 考试）");
