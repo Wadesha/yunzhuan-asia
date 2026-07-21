@@ -187,6 +187,24 @@ async function driveJianhu(dom) {
   ok("D: 退出不清空进度存档", !!(progAfter && progAfter.idx >= 2), JSON.stringify(progAfter));
   ok("D: 点继续上次恢复到做题界面", click(domD, '[data-act="resume"]') && !!docD.querySelector("#app .q .qt"));
 
+  console.log("\n=== E. 底部导航链接 ===");
+  function hasFooterLink(relPath, href) {
+    const html = fs.readFileSync(path.join(BASE, relPath), "utf8");
+    const dom = new JSDOM(html); // 仅解析静态结构，不执行脚本
+    return !!dom.window.document.querySelector('footer .footnav a[href="' + href + '"]');
+  }
+  const FOOTER = {
+    "index.html": ["jianhu/index.html", "wuxiandian/index.html", "history.html", "../"],
+    "jianhu/index.html": ["../", "../wuxiandian/index.html", "../history.html", "../../"],
+    "wuxiandian/index.html": ["../", "../jianhu/index.html", "../history.html", "../../"],
+    "history.html": ["index.html", "jianhu/index.html", "wuxiandian/index.html", "../"]
+  };
+  Object.keys(FOOTER).forEach(function (rel) {
+    FOOTER[rel].forEach(function (l) {
+      ok("E: " + rel + " 含底部导航 " + l, hasFooterLink(rel, l));
+    });
+  });
+
   console.log("\n=== 结果 ===");
   console.log("PASS=" + pass + "  FAIL=" + fail);
   process.exit(fail ? 1 : 0);
