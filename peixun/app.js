@@ -182,6 +182,7 @@
         answer: q.t === "multi"
           ? (Array.isArray(q.a) ? q.a : String(q.a).split("|").map(function (x) { return x.trim(); }))
           : (Array.isArray(q.a) ? q.a[0] : q.a),
+        exp: q.e || null,
         qkey: catId + "/" + examId + (subId ? "/" + subId : "") + "/" + i
       };
     });
@@ -266,15 +267,26 @@
       el.className = cls;
     }
   }
+  // 判分反馈 HTML（含解析/考点）；showFeedback 与 renderQuiz 共用，保证一致
+  function fbHtml(q) {
+    var isCor = grade(q, quiz.sel[q.id]);
+    var html = '<div class="fb ' + (isCor ? "ok" : "no") + '">' + (isCor ? "回答正确" : "回答错误") +
+      ' · 正确答案：' + esc(answerText(q)) + '</div>';
+    if (q.exp) {
+      var ex = String(q.exp).replace(/^考点[：:]\s*/, "");
+      html += '<div class="exp"><span class="exp-h">解析 / 考点</span>' + esc(ex) + '</div>';
+    }
+    return html;
+  }
   function showFeedback(q) {
     var fb = appEl().querySelector(".q .fb");
     if (quiz.graded[q.id]) {
-      var isCor = grade(q, quiz.sel[q.id]);
-      var html = '<div class="fb ' + (isCor ? "ok" : "no") + '">' + (isCor ? "回答正确" : "回答错误") +
-        ' · 正确答案：' + esc(answerText(q)) + '</div>';
+      var html = fbHtml(q);
+      var oldExp = appEl().querySelector(".q .exp");
+      if (oldExp) oldExp.parentNode.removeChild(oldExp);
       if (fb) {
-        var tmp = document.createElement("div"); tmp.innerHTML = html;
-        fb.parentNode.replaceChild(tmp.firstChild, fb);
+        fb.insertAdjacentHTML("afterend", html);
+        fb.parentNode.removeChild(fb);
       } else {
         var acts = appEl().querySelector(".q .acts");
         if (acts) acts.insertAdjacentHTML("beforebegin", html);
@@ -416,9 +428,7 @@
     var graded = quiz.graded[q.id];
     var fb = "";
     if (graded) {
-      var isCor = grade(q, quiz.sel[q.id]);
-      fb = '<div class="fb ' + (isCor ? "ok" : "no") + '">' + (isCor ? "回答正确" : "回答错误") +
-        ' · 正确答案：' + esc(answerText(q)) + '</div>';
+      fb = fbHtml(q);
     }
     var hint = "", actBtn;
     if (graded) {
