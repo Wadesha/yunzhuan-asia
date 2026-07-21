@@ -404,7 +404,7 @@ a{color:inherit;text-decoration:none;}
         readNote+
         '<div class="opts">'+hint+optHtml(q)+'</div>'+
         (graded?fb:'')+
-        '<div class="acts">'+actBtn+'</div>'+
+        '<div class="acts">'+actBtn+'<button class="btn ghost" data-act="exit">保存并退出</button></div>'+
       '</div>';
     if(autoFire){
       state.lastReadId = q.id; state.reading = true;
@@ -521,6 +521,7 @@ a{color:inherit;text-decoration:none;}
       }
       else if(act==="again"){ clearProgress(); state.phase="quiz"; buildList(false); render(); }
       else if(act==="home"){ clearProgress(); state.phase="start"; render(); }
+      else if(act==="exit"){ state.phase="start"; render(); }
       else if(act==="read"){
         if(state.reading){ stopRead(); state.reading = false; renderReadBtn(); }
         else { readAloud(state.list[state.idx].q); state.reading = true; state.lastReadId = state.list[state.idx].id; renderReadBtn(); }
