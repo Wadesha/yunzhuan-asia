@@ -141,6 +141,12 @@
     if (q.type === "multi") return q.answer.join("、");
     return q.answer;
   }
+  // 判分后朗读正确答案（与自动朗读题干相互独立）
+  function readAnswer(q) {
+    if (!synth) return;
+    var isCor = grade(q, quiz.sel[q.id]);
+    readAloud((isCor ? "回答正确" : "回答错误") + "。正确答案：" + answerText(q));
+  }
 
   /* ---------- 当前刷题会话 ---------- */
   var quiz = null;
@@ -298,6 +304,8 @@
       '<h1 class="page-title">职业资格考试 · 刷题目录</h1>' +
       '<p class="page-sub">国家职业资格考试（笔试形态）目录 + 技能人员职业资格信息。点击分类进入，选择考试即可刷题。' +
       '每考试附少量贴合其真实科目范围的演示题（非官方真题，仅供参考）。</p>' +
+      '<div class="notebox">本目录为各职业资格考试（笔试形态）的演示题库，题目依据公开科目范围编写，<b>非官方真题</b>，仅供参考。进入考试后可刷题，<b>判分后会自动朗读正确答案</b>；做题记录按用户保存在本机。下方为既有的独立刷题模块。</div>' +
+      '<div class="modnav"><span class="cur">刷题目录</span><a href="jianhu/">监护刷题</a><a href="wuxiandian/">业余无线电刷题</a></div>' +
       '<div class="cards">' + cats + '</div>' +
       '<div class="section-h">其他刷题模块（既有）</div>' +
       '<div class="cards">' +
@@ -318,8 +326,10 @@
     }).join("");
     document.getElementById("app").innerHTML =
       '<p class="crumb"><a href="#">职业资格考试</a> / ' + esc(cat.name) + '</p>' +
+      '<div class="modnav"><a href="#">刷题目录</a><a href="jianhu/">监护刷题</a><a href="wuxiandian/">业余无线电刷题</a></div>' +
       '<h1 class="page-title">' + esc(cat.name) + '</h1>' +
       (cat.note ? '<p class="page-sub">' + esc(cat.note) + '</p>' : '') +
+      '<div class="notebox">点击考试卡片进入；可刷题的考试点「开始刷题」即进入题目，<b>判分后自动朗读正确答案</b>。</div>' +
       '<div class="cards">' + cards + '</div>';
   }
 
@@ -349,8 +359,10 @@
     }
     document.getElementById("app").innerHTML =
       '<p class="crumb"><a href="#">职业资格考试</a> / <a href="#/cat/' + cat.id + '">' + esc(cat.name) + '</a> / ' + esc(exam.name) + '</p>' +
+      '<div class="modnav"><a href="#">刷题目录</a><a href="jianhu/">监护刷题</a><a href="wuxiandian/">业余无线电刷题</a></div>' +
       '<h1 class="page-title">' + esc(exam.name) + '</h1>' +
       '<p class="page-sub">组织：' + esc(exam.body || "—") + (exam.site ? ' · 官网：' + esc(exam.site) : '') + '</p>' +
+      '<div class="notebox">开始刷题后 <b>判分会自动朗读正确答案</b>；做题记录按当前用户保存在本机（可在右上角切换用户）。进度支持「继续上次」。</div>' +
       chip(exam.levels, "层级 / 阶段") +
       chip(exam.subjects, "主要科目") +
       (exam.quiz === false ? "" : '<div class="section-h">朗读</div><div class="chips"><span class="chip' + (autoRead ? " on" : "") + '" data-act="toggle-autoread">自动朗读题干：' + (autoRead ? "开" : "关") + '</span></div>') +
@@ -380,7 +392,9 @@
       actBtn = '';
     }
     var readNote = (!speechOK) ? '<div class="hint">当前浏览器不支持语音朗读，可手动阅读题干。</div>'
-                  : (autoRead ? '<div class="hint">已开启自动朗读（移动端需先在页面内点击一次以解锁声音）。</div>' : '');
+                  : (autoRead
+                      ? '<div class="hint">已开启自动朗读（移动端需先点击一次解锁声音）；判分后会自动朗读正确答案。</div>'
+                      : '<div class="hint">判分后会自动朗读正确答案；可在考试页开启「自动朗读题干」让每题先读题干。</div>');
     document.getElementById("app").innerHTML =
       '<p class="crumb"><a href="#">职业资格考试</a> / <a href="#/cat/' + quiz.catId + '">' + esc(findCat(quiz.catId).name) +
         '</a> / <a href="#/exam/' + quiz.catId + '/' + quiz.examId + '">' + esc(findExam(findCat(quiz.catId), quiz.examId).name) + '</a></p>' +
@@ -395,7 +409,7 @@
         '<div class="acts">' + actBtn + '</div></div>';
     if (autoFire) {
       lastReadId = q.id; reading = true;
-      setTimeout(function () { readAloud(q.q); }, 80);
+      setTimeout(function () { if (quiz.graded[q.id]) return; readAloud(q.q); }, 80);
     }
   }
 
@@ -454,6 +468,7 @@
           quiz.sel[q.id] = oi;
           doGrade(q);
           paintOptions(q); showFeedback(q); renderActions(q);
+          readAnswer(q);
         }
         saveQuizProgress();
         return;
@@ -476,6 +491,7 @@
         if (quiz.graded[qc.id]) return;
         if (!(quiz.sel[qc.id] && quiz.sel[qc.id].length > 0)) return;
         doGrade(qc); paintOptions(qc); showFeedback(qc); renderActions(qc);
+        readAnswer(qc);
         saveQuizProgress();
       } else if (act === "next") {
         quiz.idx++;
