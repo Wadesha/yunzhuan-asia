@@ -28,7 +28,7 @@
       var total = quiz.list.length; if (!total) return;
       var acc = Math.round(100 * quiz.correct / total);
       var a = Sget(ATTEMPT_KEY); if (!Array.isArray(a)) a = [];
-      a.unshift({ ts: Date.now(), catId: quiz.catId, examId: quiz.examId,
+      a.unshift({ ts: Date.now(), catId: quiz.catId, examId: quiz.examId, subId: quiz.subId,
                   total: total, correct: quiz.correct, wrong: quiz.wrong, acc: acc });
       if (a.length > 50) a.length = 50;
       Sset(ATTEMPT_KEY, a);
@@ -162,10 +162,18 @@
       return m ? m[1] : s.trim();
     });
   }
-  function startQuiz(catId, examId) {
+  function findSub(exam, subId) {
+    if (!exam || !exam.sub || !subId) return null;
+    for (var i = 0; i < exam.sub.length; i++) if (exam.sub[i].id === subId) return exam.sub[i];
+    return null;
+  }
+  function startQuiz(catId, examId, subId) {
     var cat = findCat(catId), exam = findExam(cat, examId);
-    if (!exam || !exam.questions) return;
-    var list = exam.questions.map(function (q, i) {
+    if (!exam) return;
+    var source = findSub(exam, subId) || exam;
+    var qs = source.questions || [];
+    if (!qs.length) return;
+    var list = qs.map(function (q, i) {
       return {
         id: "q" + i,
         type: q.t,
@@ -174,10 +182,10 @@
         answer: q.t === "multi"
           ? (Array.isArray(q.a) ? q.a : String(q.a).split("|").map(function (x) { return x.trim(); }))
           : (Array.isArray(q.a) ? q.a[0] : q.a),
-        qkey: catId + "/" + examId + "/" + i
+        qkey: catId + "/" + examId + (subId ? "/" + subId : "") + "/" + i
       };
     });
-    quiz = { catId: catId, examId: examId, list: list, idx: 0, sel: {}, graded: {}, correct: 0, wrong: 0, attempted: false };
+    quiz = { catId: catId, examId: examId, subId: subId || null, list: list, idx: 0, sel: {}, graded: {}, correct: 0, wrong: 0, attempted: false };
     lastReadId = null;
     render();
   }
@@ -193,8 +201,8 @@
   function Sget(k){ if(window.Store) return window.Store.get(k); try { return JSON.parse(localStorage.getItem(k) || "null"); } catch(e){ return null; } }
   function Sset(k,v){ if(window.Store) return window.Store.set(k,v); try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
   function Srem(k){ if(window.Store) return window.Store.remove(k); try { localStorage.removeItem(k); } catch(e){} }
-  function progressKey(catId, examId) {
-    return "peixun_quiz_v1_" + catId + "_" + examId;
+  function progressKey(catId, examId, subId) {
+    return "peixun_quiz_v1_" + catId + "_" + examId + (subId ? "_" + subId : "");
   }
   function saveQuizProgress() {
     try {
@@ -339,40 +347,66 @@
       '<div class="cards">' + cards + '</div>';
   }
 
+  function allQkeys(catId, exam) {
+    var keys = [];
+    if (exam.sub && exam.sub.length) {
+      exam.sub.forEach(function (s) {
+        (s.questions || []).forEach(function (_, i) { keys.push(catId + "/" + exam.id + "/" + s.id + "/" + i); });
+      });
+    } else {
+      (exam.questions || []).forEach(function (_, i) { keys.push(catId + "/" + exam.id + "/" + i); });
+    }
+    return keys;
+  }
+
   function renderExamDetail(route) {
     var cat = findCat(route.catId), exam = findExam(cat, route.examId);
     if (!exam) { location.hash = "#/cat/" + route.catId; return; }
-    if (quiz && quiz.examId === route.examId && false) { /* noop */ }
-    var qkeys = (exam.questions || []).map(function (_, i) { return route.catId + "/" + exam.id + "/" + i; });
+    var qkeys = allQkeys(route.catId, exam);
     var prog = userProgress(qkeys);
     var chip = function (arr, label) {
       if (!arr || !arr.length) return "";
       return '<div class="section-h">' + label + '</div><div class="chips">' +
         arr.map(function (x) { return '<span class="chip on">' + esc(x) + '</span>'; }).join("") + '</div>';
     };
-    var p = loadQuizProgress(cat.id, exam.id);
     var body;
     if (exam.quiz === false) {
       body = '<div class="q"><div class="qt">该考试以实操考核为主体，非纯笔试形态，本目录仅作信息列举。</div>' +
         (exam.note ? '<div class="hint">' + esc(exam.note) + '</div>' : '') + '</div>';
+    } else if (exam.sub && exam.sub.length) {
+      var subs = exam.sub.map(function (s) {
+        var qn = s.questions ? s.questions.length : 0;
+        if (!qn) return "";
+        var p = loadQuizProgress(cat.id, exam.id, s.id);
+        var resume = p ? '<button class="btn" data-act="resume-quiz" data-cat="' + cat.id + '" data-exam="' + exam.id + '" data-sub="' + s.id + '">继续上次（第 ' + Math.min(p.idx + 1, qn) + '/' + qn + '）</button>' : '';
+        var startTxt = p ? '重新开始' : ('开始刷题（' + qn + ' 题）');
+        return '<div class="subcard"><div class="sub-name">' + esc(s.name) + '</div>' +
+          '<div class="sub-meta">' + qn + ' 题</div>' +
+          '<div class="acts">' + resume +
+          '<button class="btn primary" data-act="start-quiz" data-cat="' + cat.id + '" data-exam="' + exam.id + '" data-sub="' + s.id + '">' + startTxt + '</button></div></div>';
+      }).join("");
+      body = '<div class="section-h">分科刷题</div><div class="subs">' + subs + '</div>';
     } else {
       var qn = exam.questions ? exam.questions.length : 0;
+      var p = loadQuizProgress(cat.id, exam.id);
       body = (p ? '<div class="acts"><button class="btn" data-act="resume-quiz" data-cat="' + cat.id + '" data-exam="' + exam.id + '">继续上次（第 ' + Math.min(p.idx + 1, qn) + ' / ' + qn + ' 题）</button></div>' : '') +
         '<div class="acts"><button class="btn primary" data-act="start-quiz" data-cat="' + cat.id +
-        '" data-exam="' + exam.id + '">' + (p ? "重新开始" : ("开始刷题（" + qn + ' 题）')) + '</button></div>' +
-        '<div class="hint">进度：已答 ' + prog.done + ' / 共 ' + prog.total +
-        '，掌握 ' + prog.cor + '。' + (p ? ' 已保存上次刷题进度，可「继续上次」或「重新开始」。' : '') + ' 做题记录随登录的云端账号同步。</div>';
+        '" data-exam="' + exam.id + '">' + (p ? "重新开始" : ("开始刷题（" + qn + ' 题）')) + '</button></div>';
     }
+    var introHtml = exam.intro ? '<div class="infobox intro"><div class="ib-h">考试介绍</div><div class="ib-b">' + esc(exam.intro) + '</div></div>' : "";
+    var benefitHtml = exam.benefit ? '<div class="infobox benefit"><div class="ib-h">通过的好处</div><div class="ib-b">' + esc(exam.benefit) + '</div></div>' : "";
     document.getElementById("app").innerHTML =
       '<p class="crumb"><a href="#">职业资格考试</a> / <a href="#/cat/' + cat.id + '">' + esc(cat.name) + '</a> / ' + esc(exam.name) + '</p>' +
       '<div class="modnav"><a href="#">刷题目录</a><a href="jianhu/">监护刷题</a><a href="wuxiandian/">业余无线电刷题</a></div>' +
       '<h1 class="page-title">' + esc(exam.name) + '</h1>' +
       '<p class="page-sub">组织：' + esc(exam.body || "—") + (exam.site ? ' · 官网：' + esc(exam.site) : '') + '</p>' +
+      (exam.intro || exam.benefit ? '<div class="info-wrap">' + introHtml + benefitHtml + '</div>' : '') +
       '<div class="notebox">开始刷题后 <b>判分会自动朗读正确答案</b>；做题记录在<b>登录云端账号后随手机同步</b>（未登录则仅存本机）。进度支持「继续上次」。</div>' +
       chip(exam.levels, "层级 / 阶段") +
-      chip(exam.subjects, "主要科目") +
+      (exam.sub && exam.sub.length ? "" : chip(exam.subjects, "主要科目")) +
       (exam.quiz === false ? "" : '<div class="section-h">朗读</div><div class="chips"><span class="chip' + (autoRead ? " on" : "") + '" data-act="toggle-autoread">自动朗读题干：' + (autoRead ? "开" : "关") + '</span></div>') +
-      body;
+      body +
+      (exam.quiz === false ? "" : '<div class="hint">进度：已答 ' + prog.done + ' / 共 ' + prog.total + '，掌握 ' + prog.cor + '。' + (exam.sub && exam.sub.length ? ' 分科进度各自保存。' : (p ? ' 已保存上次刷题进度，可「继续上次」或「重新开始」。' : '')) + ' 做题记录随登录的云端账号同步。</div>');
   }
 
   function renderQuiz() {
@@ -481,12 +515,13 @@
       }
       var act = t.getAttribute("data-act");
       if (act === "start-quiz") {
-        clearQuizProgress(t.getAttribute("data-cat"), t.getAttribute("data-exam"));
-        startQuiz(t.getAttribute("data-cat"), t.getAttribute("data-exam"));
+        var _sc = t.getAttribute("data-cat"), _se = t.getAttribute("data-exam"), _ss = t.getAttribute("data-sub") || null;
+        clearQuizProgress(_sc, _se, _ss);
+        startQuiz(_sc, _se, _ss);
       } else if (act === "resume-quiz") {
-        var rc = t.getAttribute("data-cat"), re = t.getAttribute("data-exam");
-        var rp = loadQuizProgress(rc, re); if (!rp) return;
-        startQuiz(rc, re);
+        var rc = t.getAttribute("data-cat"), re = t.getAttribute("data-exam"), rs = t.getAttribute("data-sub") || null;
+        var rp = loadQuizProgress(rc, re, rs); if (!rp) return;
+        startQuiz(rc, re, rs);
         quiz.idx = Math.min(rp.idx || 0, quiz.list.length - 1);
         quiz.sel = rp.sel || {}; quiz.graded = rp.graded || {};
         quiz.correct = rp.correct || 0; quiz.wrong = rp.wrong || 0;
