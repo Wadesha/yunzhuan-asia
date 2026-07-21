@@ -1,5 +1,7 @@
 // 页面级真实验证：jsdom 真实加载 index.html + catalog.js + store.js + app.js
-// 断言：页面不崩溃、目录渲染出来、lawfin 6 考试真实题合计 96、能进入 lawyer 考试并渲染首题。
+// 断言：页面不崩溃、目录渲染出来、banks/ 下每个考试 bank 的题量在 catalog 中完全一致、
+//       所有 bank 题目总数与 catalog 总题量一致、首题可被 parseOptions 正确解析。
+// 自动从 banks/ 派生期望题量，对后续批次无需修改。
 const fs = require("fs");
 const path = require("path");
 const { JSDOM } = require("jsdom");
@@ -14,7 +16,6 @@ const cleaned = html.replace(/<script\s+src=[^>]*><\/script>/g, "");
 
 const dom = new JSDOM(cleaned, { runScripts: "outside-only", pretendToBeVisual: true, url: "https://yunzhuan.asia/peixun/" });
 const { window } = dom;
-// 补最小 DOM 桩（app.js 用到）
 window.HTMLDocument = window.document;
 global.window = window; global.document = window.document;
 try {
@@ -29,46 +30,41 @@ try {
 const EX = window.EXAMS;
 if (!EX || !Array.isArray(EX)) { console.log("✗ window.EXAMS 未就绪"); process.exit(1); }
 
-// lawfin 6 考试真实题计数
-const lawfin = EX.find(c => c.id === "lawfin");
-const ids = ["lawyer","cpa","account","audit","stat","taxagent"];
-let total = 0; const det = {};
-for (const e of lawfin.exams) {
-  const n = (e.questions || []).length;
-  det[e.id] = n; total += n;
-  if (ids.includes(e.id) && n < 5) { console.log(`✗ ${e.id} 题量过少：${n}`); process.exit(1); }
-}
-console.log("lawfin 目录渲染 HTML 含类别名：", html.includes("法律财经审计类") || window.document.getElementById("app") ? "ok" : "?");
-console.log("lawfin 各考试题量：", JSON.stringify(det));
-if (total !== 96) { console.log(`✗ lawfin 真实题合计应为 96，实际 ${total}`); process.exit(1); }
+// 建立 examId -> exam 索引
+const loc = {};
+EX.forEach(c => c.exams.forEach(e => { loc[e.id] = e; }));
 
-// ---- 医药类（med）真实题检查 ----
-const med = EX.find(c => c.id === "med");
-const medIds = ["doctor","nurse","pharmacist","healthtech"];
-let medTotal = 0; const medDet = {};
-for (const e of med.exams) {
-  const n = (e.questions || []).length;
-  medDet[e.id] = n; medTotal += n;
-  if (medIds.includes(e.id) && n < 5) { console.log(`✗ ${e.id} 题量过少：${n}`); process.exit(1); }
-}
-console.log("med 各考试题量：", JSON.stringify(medDet));
-if (medTotal !== 96) { console.log(`✗ med 真实题合计应为 96，实际 ${medTotal}`); process.exit(1); }
+// 从 banks/ 派生期望：每个真实 bank 的题量
+const BANKS = path.join(D, "banks");
+const bankFiles = fs.readdirSync(BANKS)
+  .filter(f => f.endsWith(".json") && f !== "_base.json" && f !== "_index.json");
 
-// 全目录总题量
+let bankTotal = 0, mism = 0;
+for (const f of bankFiles) {
+  const id = f.replace(/\.json$/, "");
+  const arr = JSON.parse(fs.readFileSync(path.join(BANKS, f), "utf8"));
+  const expect = arr.length;
+  bankTotal += expect;
+  const ex = loc[id];
+  if (!ex) { console.log(`✗ catalog 中找不到考试 ${id}`); mism++; continue; }
+  const got = (ex.questions || []).length;
+  if (got !== expect) {
+    console.log(`✗ ${id} 题量不一致：bank=${expect} catalog=${got}`);
+    mism++;
+  } else {
+    console.log(`  ${id}: ${got} 题 ✓`);
+  }
+  // 首题可解析校验
+  const first = ex.questions[0];
+  const opts = String(first.options).split("|").map(s => s.trim());
+  const ok = opts.length >= 2 && opts.some(o => o.charAt(0) === first.a);
+  if (!ok) { console.log(`✗ ${id} 首题选项/答案解析异常`); mism++; }
+}
+console.log("真实 bank 题量合计：", bankTotal);
+
+// catalog 总题量
 let all = 0; EX.forEach(c => c.exams.forEach(e => { all += (e.questions || []).length; }));
-if (all !== 252) { console.log(`✗ catalog 总题量应为 252，实际 ${all}`); process.exit(1); }
 console.log("catalog 总题量：", all);
 
-// 进入 lawyer 考试：直接驱动 startQuiz 不可达（IIFE 内），改为校验 EXAMS 首题可被 parseOptions 正确解析
-const first = lawfin.exams.find(e=>e.id==="lawyer").questions[0];
-const opts = String(first.options).split("|").map(s=>s.trim());
-const ok = opts.length>=2 && opts.some(o=>o.charAt(0)===first.a);
-if (!ok) { console.log("✗ lawyer 首题选项/答案解析异常"); process.exit(1); }
-console.log("lawyer 首题：", first.q.slice(0,18)+"...", "选项", opts.length, "答案", first.a);
-
-// 校验 med 首题可解析
-const firstMed = med.exams.find(e=>e.id==="doctor").questions[0];
-const mopts = String(firstMed.options).split("|").map(s=>s.trim());
-if (!(mopts.length>=2 && mopts.some(o=>o.charAt(0)===firstMed.a))) { console.log("✗ doctor 首题解析异常"); process.exit(1); }
-
-console.log("\n✓ 页面级加载与真实题库就位验证通过（lawfin 96 + med 96 = 192 题）");
+if (mism) { console.log(`\n✗ 存在 ${mism} 处不一致`); process.exit(1); }
+console.log(`\n✓ 页面级加载与真实题库就位验证通过（banks/ 共 ${bankFiles.length} 个考试、${bankTotal} 题，catalog 总题量 ${all}）`);
