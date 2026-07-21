@@ -47,6 +47,11 @@
   .wrong-line { font-size:14px; color:#566; }
   .wrong-line a { color:var(--accent); text-decoration:none; }
   .wrong-line a:hover { text-decoration:underline; }
+  .footnav{display:flex;flex-wrap:wrap;gap:10px 20px;margin:0 0 10px;}
+  .footnav a{color:#2b6cb0;text-decoration:none;font-size:13.5px;font-weight:500;}
+  .footnav a:hover{text-decoration:underline;}
+  .foot .shell{flex-direction:column;align-items:flex-start;}
+  .foot-tip{font-size:12px;color:#9aa7b0;}
 </style>
 </head>
 <body>
@@ -194,5 +199,14 @@
   window.__peixunReRender = render;
   setTimeout(render, 600);
 </script>
+<footer class="foot"><div class="shell">
+  <nav class="footnav">
+    <a href="index.html">刷题总目录</a>
+    <a href="jianhu/index.html">监护培训考核</a>
+    <a href="wuxiandian/index.html">业余无线电</a>
+    <a href="../">云篆官网</a>
+  </nav>
+  <span class="foot-tip">做题历史 · 聚合三模块进度与错题</span>
+</div></footer>
 </body>
 </html>
