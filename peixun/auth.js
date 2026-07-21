@@ -34,19 +34,28 @@
     var s = document.createElement("style"); s.id = "peixun-auth-css";
     s.textContent =
       "#peixun-cloud-banner,#peixun-cloud-bar{position:fixed;left:12px;bottom:12px;z-index:9999;" +
-      "background:#2f4858;color:#fff;padding:10px 12px;border-radius:10px;font:13px/1.4 sans-serif;" +
+      "background:#2f4858;color:#fff;padding:10px 12px;border-radius:12px;font:13px/1.4 sans-serif;" +
       "display:flex;gap:8px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,.25)}" +
       "#peixun-cloud-bar{right:12px;left:auto}" +
       "#peixun-cloud-banner button,#peixun-cloud-bar button{background:#fff;color:#2f4858;border:0;" +
-      "border-radius:6px;padding:4px 10px;cursor:pointer;font:13px sans-serif}" +
-      "#peixun-cloud-modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;" +
-      "display:flex;align-items:center;justify-content:center}" +
-      ".pc-modal-box{background:#fff;color:#222;border-radius:12px;padding:20px;width:300px;max-width:90vw;" +
-      "font:13px/1.5 sans-serif;display:flex;flex-direction:column;gap:10px}" +
-      ".pc-modal-box h3{margin:0;font-size:15px}.pc-modal-box label{display:flex;flex-direction:column;gap:4px}" +
-      ".pc-modal-box input{border:1px solid #ccc;border-radius:6px;padding:6px}" +
-      ".pc-hint{color:#b00;font-size:12px;margin:0}" +
-      ".pc-modal-box button{background:#2f4858;color:#fff;border:0;border-radius:6px;padding:8px;cursor:pointer}";
+      "border-radius:8px;padding:5px 12px;cursor:pointer;font:13px sans-serif}" +
+      "#peixun-cloud-modal{position:fixed;inset:0;background:rgba(20,30,40,.5);z-index:10000;" +
+      "display:flex;align-items:center;justify-content:center;padding:16px}" +
+      ".pc-modal-box{background:#fff;color:#222;border-radius:16px;padding:24px;width:330px;max-width:100%;" +
+      "font:14px/1.5 sans-serif;display:flex;flex-direction:column;gap:14px;box-shadow:0 12px 40px rgba(0,0,0,.3)}" +
+      ".pc-modal-box h3{margin:0;font-size:17px;font-weight:500;color:#2f4858}" +
+      ".pc-field{display:flex;flex-direction:column;gap:6px}" +
+      ".pc-field label{font-size:13px;color:#555;font-weight:500}" +
+      ".pc-field input{border:1.5px solid #d8dce0;border-radius:10px;padding:11px 12px;font-size:16px;" +
+      "outline:none;transition:border-color .15s;letter-spacing:1px;width:100%;box-sizing:border-box}" +
+      ".pc-field input:focus{border-color:#2f4858}" +
+      ".pc-field.bad input{border-color:#d8503a}" +
+      ".pc-err{color:#d8503a;font-size:12px;margin:0;min-height:14px}" +
+      ".pc-note{color:#8a9099;font-size:12px;margin:0;line-height:1.5}" +
+      ".pc-actions{display:flex;gap:10px;margin-top:2px}" +
+      ".pc-btn{flex:1;border:0;border-radius:10px;padding:12px;cursor:pointer;font-size:15px;font-weight:500}" +
+      ".pc-btn-primary{background:#2f4858;color:#fff}" +
+      ".pc-btn-ghost{background:#eef0f2;color:#2f4858}";
     document.head.appendChild(s);
   }
 
@@ -111,24 +120,51 @@
       var m = document.createElement("div"); m.id = "peixun-cloud-modal";
       m.innerHTML =
         '<div class="pc-modal-box">' +
-        '<h3>存到云端（手机号即用户名，不验证）</h3>' +
-        '<label>手机号 <input id="pc-phone" placeholder="11 位手机号"></label>' +
-        '<label>再输一遍 <input id="pc-phone2" placeholder="确认手机号"></label>' +
-        '<label>简单 PIN（可选，云端密码）<input id="pc-pin" placeholder="可留空"></label>' +
-        '<p class="pc-hint">仅靠手机号标识，无额外验证；建议设 PIN 更安全。</p>' +
-        '<button id="pc-create">创建并同步</button>' +
-        '<button id="pc-cancel">取消</button>' +
+        '<h3>存到云端</h3>' +
+        '<p class="pc-note">手机号就是你的账号，无需验证；可选设 6 位 PIN 当云端密码，更安全。</p>' +
+        '<div class="pc-field" id="f-phone"><label>手机号</label>' +
+          '<input id="pc-phone" type="tel" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="11 位手机号">' +
+          '<p class="pc-err" id="e-phone"></p></div>' +
+        '<div class="pc-field" id="f-phone2"><label>再输一遍</label>' +
+          '<input id="pc-phone2" type="tel" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="确认手机号">' +
+          '<p class="pc-err" id="e-phone2"></p></div>' +
+        '<div class="pc-field" id="f-pin"><label>简单 PIN（可选，云端密码）</label>' +
+          '<input id="pc-pin" type="tel" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="6 位数字，可留空">' +
+          '<p class="pc-err" id="e-pin"></p></div>' +
+        '<div class="pc-actions">' +
+          '<button class="pc-btn pc-btn-ghost" id="pc-cancel">取消</button>' +
+          '<button class="pc-btn pc-btn-primary" id="pc-create">创建并同步</button>' +
+        '</div>' +
         '</div>';
       document.body.appendChild(m);
+
+      var phone = m.querySelector("#pc-phone"), phone2 = m.querySelector("#pc-phone2"), pin = m.querySelector("#pc-pin");
+      function onlyDigits(el, max) { el.value = el.value.replace(/\D/g, "").slice(0, max); }
+      phone.addEventListener("input", function () { onlyDigits(phone, 11); clearErr("phone"); });
+      phone2.addEventListener("input", function () { onlyDigits(phone2, 11); clearErr("phone2"); });
+      pin.addEventListener("input", function () { onlyDigits(pin, 6); clearErr("pin"); });
+
+      function setErr(field, msg) {
+        var f = m.querySelector("#f-" + field), e = m.querySelector("#e-" + field);
+        if (f) f.classList.add("bad");
+        if (e) e.textContent = msg;
+      }
+      function clearErr(field) {
+        var f = m.querySelector("#f-" + field), e = m.querySelector("#e-" + field);
+        if (f) f.classList.remove("bad");
+        if (e) e.textContent = "";
+      }
+
       m.querySelector("#pc-cancel").onclick = function () { m.remove(); };
       m.querySelector("#pc-create").onclick = function () {
-        var p1 = m.querySelector("#pc-phone").value.trim();
-        var p2 = m.querySelector("#pc-phone2").value.trim();
-        if (!/^1\d{10}$/.test(p1)) { alert("手机号格式不对"); return; }
-        if (p1 !== p2) { alert("两次手机号不一致"); return; }
-        var pin = m.querySelector("#pc-pin").value;
+        var p1 = phone.value, p2 = phone2.value, pinv = pin.value;
+        var ok = true;
+        if (!/^1\d{10}$/.test(p1)) { setErr("phone", "请输入 11 位手机号（以 1 开头）"); ok = false; }
+        if (ok && p1 !== p2) { setErr("phone2", "两次手机号不一致"); ok = false; }
+        if (pinv && !/^\d{6}$/.test(pinv)) { setErr("pin", "PIN 需为 6 位数字"); ok = false; }
+        if (!ok) return;
         var sb = newBackend();
-        sb.createSlot(p1, pin).then(function () {
+        sb.createSlot(p1, pinv).then(function () {
           migrateLocalToCloud(sb);   // 首次占坑：把本机已有进度并入云端
           saveIdentity({ slot_id: sb._slotId, slot_secret: sb._slotSecret, phone: p1 });
           root.Store.use(sb);
@@ -138,13 +174,15 @@
           if (e && e.conflict) {
             m.querySelector(".pc-modal-box").innerHTML =
               '<h3>该手机号已注册</h3>' +
-              '<p>这个手机号已经在云端有账号了。</p>' +
-              '<button id="pc-tologin">我是本人，去登录</button>' +
-              '<button id="pc-change">换一个手机号</button>';
+              '<p class="pc-note">这个手机号已经在云端有账号了。如果你是本人，直接登录即可。</p>' +
+              '<div class="pc-actions">' +
+                '<button class="pc-btn pc-btn-ghost" id="pc-change">换一个手机号</button>' +
+                '<button class="pc-btn pc-btn-primary" id="pc-tologin">我是本人，去登录</button>' +
+              '</div>';
             m.querySelector("#pc-tologin").onclick = function () { m.remove(); PeixunAuth.showLogin(p1); };
             m.querySelector("#pc-change").onclick = function () { m.remove(); PeixunAuth.showRegister(); };
           } else {
-            alert("创建失败：" + (e && e.message));
+            setErr("phone", "创建失败：" + (e && e.message));
           }
         });
       };
@@ -155,27 +193,44 @@
       m.innerHTML =
         '<div class="pc-modal-box">' +
         '<h3>登录云端账号</h3>' +
-        '<label>手机号 <input id="pc-phone" placeholder="11 位手机号" value="' + (prefill || "") + '"></label>' +
-        '<label>PIN（若设置）<input id="pc-pin" placeholder="留空若未设 PIN" type="password"></label>' +
-        '<button id="pc-go">登录</button>' +
-        '<button id="pc-cancel">取消</button>' +
+        '<p class="pc-note">用注册时的手机号和 PIN 登录，进度会从云端拉回本机。</p>' +
+        '<div class="pc-field" id="f-phone"><label>手机号</label>' +
+          '<input id="pc-phone" type="tel" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="11 位手机号" value="' + (prefill || "") + '">' +
+          '<p class="pc-err" id="e-phone"></p></div>' +
+        '<div class="pc-field" id="f-pin"><label>PIN（若设置）</label>' +
+          '<input id="pc-pin" type="password" autocomplete="off" maxlength="6" placeholder="留空若未设 PIN">' +
+          '<p class="pc-err" id="e-pin"></p></div>' +
+        '<div class="pc-actions">' +
+          '<button class="pc-btn pc-btn-ghost" id="pc-cancel">取消</button>' +
+          '<button class="pc-btn pc-btn-primary" id="pc-go">登录</button>' +
+        '</div>' +
         '</div>';
       document.body.appendChild(m);
+      var phone = m.querySelector("#pc-phone"), pin = m.querySelector("#pc-pin");
+      phone.addEventListener("input", function () {
+        phone.value = phone.value.replace(/\D/g, "").slice(0, 11);
+        var f = m.querySelector("#f-phone"), e = m.querySelector("#e-phone");
+        if (f) f.classList.remove("bad"); if (e) e.textContent = "";
+      });
+      function setErr(field, msg) {
+        var f = m.querySelector("#f-" + field), e = m.querySelector("#e-" + field);
+        if (f) f.classList.add("bad"); if (e) e.textContent = msg;
+      }
       m.querySelector("#pc-cancel").onclick = function () { m.remove(); };
       m.querySelector("#pc-go").onclick = function () {
-        var phone = m.querySelector("#pc-phone").value.trim();
-        var pin = m.querySelector("#pc-pin").value;
+        var p = phone.value, pinv = pin.value;
+        if (!/^1\d{10}$/.test(p)) { setErr("phone", "请输入 11 位手机号"); return; }
         var sb = newBackend();
-        sb.login(phone, pin).then(function () {
+        sb.login(p, pinv).then(function () {
           migrateLocalToCloud(sb);   // 登录：把云端还没有的本机 key 补传上去（不覆盖云端）
-          saveIdentity({ slot_id: sb._slotId, slot_secret: sb._slotSecret, phone: phone });
+          saveIdentity({ slot_id: sb._slotId, slot_secret: sb._slotSecret, phone: p });
           root.Store.use(sb);
           m.remove();
           PeixunAuth.renderBar();
         }).catch(function (e) {
-          if (e && e.not_found) alert("该手机号未注册，请先注册");
-          else if (e && e.bad_pin) alert("PIN 错误");
-          else alert("登录失败：" + (e && e.message));
+          if (e && e.not_found) setErr("phone", "该手机号未注册，请先注册");
+          else if (e && e.bad_pin) setErr("pin", "PIN 错误");
+          else setErr("phone", "登录失败：" + (e && e.message));
         });
       };
     },
