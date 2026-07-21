@@ -238,5 +238,9 @@
   "teacherrec": {
     "cat": "gov",
     "name": "教师招聘考试"
+  },
+  "constructor2": {
+    "cat": "eng",
+    "name": "二级建造师"
   }
 }
