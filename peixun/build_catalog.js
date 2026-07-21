@@ -18,7 +18,7 @@ const base = JSON.parse(fs.readFileSync(path.join(BANKS, "_base.json"), "utf8"))
 const loc = {};
 base.forEach((c, ci) => c.exams.forEach((e, ei) => { loc[e.id] = { ci, ei }; }));
 
-let replaced = 0, totalQ = 0, withSub = 0, withMeta = 0;
+let replaced = 0, totalQ = 0, withSub = 0, withMeta = 0, totalReads = 0;
 for (const f of fs.readdirSync(BANKS)) {
   if (!f.endsWith(".json")) continue;
   if (f === "_base.json" || f === "_index.json") continue;
@@ -36,16 +36,19 @@ for (const f of fs.readdirSync(BANKS)) {
       exam.sub = bank.sub.map(s => ({
         id: s.id,
         name: s.name,
-        questions: s.questions || []
+        questions: s.questions || [],
+        reads: Array.isArray(s.reads) ? s.reads : undefined
       }));
       const flat = [];
       bank.sub.forEach(s => (s.questions || []).forEach(q => flat.push(q)));
       exam.questions = flat;
       totalQ += flat.length;
+      bank.sub.forEach(s => { if (Array.isArray(s.reads)) totalReads += s.reads.length; });
       withSub++;
     } else if (Array.isArray(bank.questions)) {
       exam.questions = bank.questions;
       totalQ += bank.questions.length;
+      if (Array.isArray(bank.reads)) { exam.reads = bank.reads; totalReads += bank.reads.length; }
     }
     if (typeof bank.intro === "string") { exam.intro = bank.intro; withMeta++; }
     if (typeof bank.benefit === "string") { exam.benefit = bank.benefit; withMeta++; }
@@ -53,7 +56,7 @@ for (const f of fs.readdirSync(BANKS)) {
     if (Array.isArray(bank.subjects)) exam.subjects = bank.subjects;
   }
   replaced++;
-  console.log(`  + ${examId}: ${exam.questions.length} 题` + (exam.sub ? `（分 ${exam.sub.length} 科）` : ""));
+  console.log(`  + ${examId}: ${exam.questions.length} 题` + (exam.sub ? `（分 ${exam.sub.length} 科）` : "") + (exam.reads ? ` + ${exam.reads.length} 阅读卡` : ""));
 }
 
 const out = "window.EXAMS = " + JSON.stringify(base) + ";\n";
@@ -61,4 +64,4 @@ fs.writeFileSync(path.join(__dirname, "catalog.js"), out);
 
 let allQ = 0;
 base.forEach(c => c.exams.forEach(e => { allQ += (e.questions || []).length; }));
-console.log(`\nDone. 覆盖 ${replaced} 个考试 bank；含分科 ${withSub} 个；含介绍/好处 ${withMeta} 项；catalog 总题量 ${allQ}`);
+console.log(`\nDone. 覆盖 ${replaced} 个考试 bank；含分科 ${withSub} 个；含介绍/好处 ${withMeta} 项；catalog 总题量 ${allQ}（客观）+ 阅读卡 ${totalReads}`);
