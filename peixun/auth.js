@@ -40,6 +40,8 @@
       "padding:6px 12px;border-radius:10px;font:13px/1.4 sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.15)}" +
       "#peixun-cloud-banner button,#peixun-cloud-bar button{background:#fff;color:#2f4858;border:0;" +
       "border-radius:8px;padding:5px 12px;cursor:pointer;font:13px sans-serif}" +
+      "#peixun-cloud-bar a.pc-hist{color:#fff;text-decoration:none;cursor:pointer;outline:none}" +
+      "#peixun-cloud-bar a.pc-hist:hover{text-decoration:underline}" +
       "#peixun-cloud-modal{position:fixed;inset:0;background:rgba(20,30,40,.5);z-index:10000;" +
       "display:flex;align-items:center;justify-content:center;padding:16px}" +
       ".pc-modal-box{background:#fff;color:#222;border-radius:16px;padding:24px;width:330px;max-width:100%;" +
@@ -88,13 +90,19 @@
       ensureCss();
       var self = this;
       var id = loadIdentity();
+      // 登录态恢复后（或本机模式）触发各刷题页重渲染，
+      // 这样登录用户刷新页面后能从云端读回进度并显示「继续上次」。
+      var done = function () {
+        if (root.__peixunReRender) { try { root.__peixunReRender(); } catch (e) {} }
+      };
       if (id) {
         var sb = newBackend();
         sb._slotId = id.slot_id; sb._slotSecret = id.slot_secret;
-        sb._hydrate().then(function () { root.Store.use(sb); self.renderBar(); })
-          .catch(function () { self.renderBar(); });
+        sb._hydrate().then(function () { root.Store.use(sb); self.renderBar(); done(); })
+          .catch(function () { self.renderBar(); done(); });
       } else {
         this.renderBar();
+        done();
       }
     },
 
@@ -259,6 +267,8 @@
     },
 
     renderBar: function () {
+      // 做题历史页自身已展示账号状态，不在页头再挂一个指向自己的链接
+      if (/\/history\.html$/.test(location.pathname)) return;
       var id = loadIdentity();
       var bar = document.getElementById("peixun-cloud-bar");
       if (!bar) {
@@ -268,10 +278,13 @@
         if (shell) { bar.style.marginLeft = "auto"; shell.appendChild(bar); }
         else { bar.style.position = "fixed"; bar.style.top = "10px"; bar.style.right = "10px"; bar.style.zIndex = "9999"; document.body.appendChild(bar); }
       }
+      // 做题历史页链接：子模块在子目录用 ../history.html，SPA 同目录用 history.html
+      var histHref = /\/(jianhu|wuxiandian)\//.test(location.pathname) ? "../history.html" : "history.html";
       if (id) {
-        bar.innerHTML = '<span>已登录（' + maskPhone(id.phone) + '）·云端同步中</span>' +
+        bar.innerHTML = '<a class="pc-hist" href="' + histHref + '" title="查看做题历史">已登录（' +
+          maskPhone(id.phone) + '）·云端同步中</a>' +
           '<button id="pc-out">退出</button>';
-        bar.querySelector("#pc-out").onclick = this.logout;
+        bar.querySelector("#pc-out").onclick = function () { PeixunAuth.logout(); };
       } else {
         bar.innerHTML = '<span>进度仅存本机</span>' +
           '<button id="pc-reg2">存到云端</button>' +
