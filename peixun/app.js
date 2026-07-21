@@ -141,11 +141,18 @@
     if (q.type === "multi") return q.answer.join("、");
     return q.answer;
   }
-  // 判分后朗读正确答案（与自动朗读题干相互独立）
+  // 朗读正确选项的【具体内容文字】，而非字母标签（如 B）
+  function correctText(q) {
+    if (q.type === "bool") return q.answer;
+    if (q.type === "multi") return q.answer.map(function (L) { var i = (typeof L === "number") ? L : (L.charCodeAt(0) - 65); return q.options[i]; }).join("；");
+    var i = (typeof q.answer === "number") ? q.answer : (q.answer.charCodeAt(0) - 65);
+    return q.options[i];
+  }
+  // 判分后朗读正确答案（与自动朗读题干相互独立；朗读的是选项内容）
   function readAnswer(q) {
     if (!synth) return;
     var isCor = grade(q, quiz.sel[q.id]);
-    readAloud((isCor ? "回答正确" : "回答错误") + "。正确答案：" + answerText(q));
+    readAloud((isCor ? "回答正确。" : "回答错误。") + "正确答案：" + correctText(q));
   }
 
   /* ---------- 当前刷题会话 ---------- */
@@ -187,27 +194,30 @@
   }
 
   /* ---------- 进度持久化（断点续刷，按用户+考试隔离） ---------- */
+  function Sget(k){ if(window.Store) return window.Store.get(k); try { return JSON.parse(localStorage.getItem(k) || "null"); } catch(e){ return null; } }
+  function Sset(k,v){ if(window.Store) return window.Store.set(k,v); try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+  function Srem(k){ if(window.Store) return window.Store.remove(k); try { localStorage.removeItem(k); } catch(e){} }
   function progressKey(catId, examId) {
     return "peixun_quiz_v1_" + users.current + "_" + catId + "_" + examId;
   }
   function saveQuizProgress() {
     try {
       if (!quiz) return;
-      localStorage.setItem(progressKey(quiz.catId, quiz.examId), JSON.stringify({
+      Sset(progressKey(quiz.catId, quiz.examId), {
         idx: quiz.idx, sel: quiz.sel, graded: quiz.graded,
         correct: quiz.correct, wrong: quiz.wrong, ts: Date.now()
-      }));
+      });
     } catch (e) {}
   }
   function loadQuizProgress(catId, examId) {
     try {
-      var p = JSON.parse(localStorage.getItem(progressKey(catId, examId)) || "null");
+      var p = Sget(progressKey(catId, examId));
       if (!p) return null;
       return p;
     } catch (e) { return null; }
   }
   function clearQuizProgress(catId, examId) {
-    try { localStorage.removeItem(progressKey(catId, examId)); } catch (e) {}
+    try { Srem(progressKey(catId, examId)); } catch (e) {}
   }
 
   /* ---------- 渲染：选项 ---------- */
