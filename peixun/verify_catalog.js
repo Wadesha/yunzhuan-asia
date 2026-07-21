@@ -1,5 +1,6 @@
 // 运行时校验：用与 app.js 的 startQuiz/grade/parseOptions/selectedValue 完全一致的逻辑，
-// 对 banks/ 下 6 个 lawfin 考试的真实题目逐题判分，断言：选正确项=对、选错项=错。
+// 对 banks/ 下所有真实考试题目逐题判分，断言：选正确项=对、选错项=错。
+// 自动发现所有 bank 文件（除 _base.json / _index.json），对后续批次无需修改。
 const fs = require("fs");
 const path = require("path");
 const BANKS = path.join(__dirname, "banks");
@@ -42,12 +43,16 @@ function normalize(q) {
 }
 function optLetters(opts) { return opts.map((_, i) => letterOf(i)); }
 
-const ids = ["lawyer", "cpa", "account", "audit", "stat", "taxagent", "doctor", "nurse", "pharmacist", "healthtech"];
-let pass = 0, fail = 0;
+const banks = fs.readdirSync(BANKS)
+  .filter(f => f.endsWith(".json") && f !== "_base.json" && f !== "_index.json")
+  .map(f => f.replace(/\.json$/, ""));
+
+let pass = 0, fail = 0, totalQ = 0;
 const fails = [];
-for (const id of ids) {
+for (const id of banks) {
   const arr = JSON.parse(fs.readFileSync(path.join(BANKS, id + ".json"), "utf8"));
   arr.forEach((q, i) => {
+    totalQ++;
     const n = normalize(q);
     const letters = optLetters(n.options);
     // 正确选支
@@ -58,7 +63,6 @@ for (const id of ids) {
     // 错误选支：选一个不等于正确答案的组合
     let wrongSel;
     if (n.type === "multi") {
-      // 取第一个非答案字母，替换掉答案第一项
       const alt = letters.find(L => !n.answer.includes(L));
       wrongSel = [letters.indexOf(alt)];
     } else {
@@ -70,6 +74,6 @@ for (const id of ids) {
     else { fail++; fails.push(`${id}[${i}] correct=${okCor} wrong=${okWr}`); }
   });
 }
-console.log(`\n判分校验：通过 ${pass} / 失败 ${fail}`);
+console.log(`\n判分校验：通过 ${pass} / 失败 ${fail}（共 ${totalQ} 题，覆盖 ${banks.length} 个考试 bank）`);
 if (fail) { console.log("失败项："); fails.forEach(f => console.log("  " + f)); process.exit(1); }
-console.log("✓ 全部真实题目判分链路正确（lawfin + 医药卫生 共 10 考试）");
+console.log("✓ 全部真实题目判分链路正确（自动覆盖 banks/ 下所有考试）");
