@@ -1,0 +1,19 @@
+name: Keep Supabase Alive
+
+# 防 Supabase Free 计划「7 天无活动自动 pause」。每 3 天自动 ping 一次，
+# 触发一次真实数据库查询即算 activity，项目永不被暂停。零成本，跑在我们自己的 repo。
+on:
+  schedule:
+    - cron: "0 8 */3 * *"   # 每 3 天 UTC 08:00
+  workflow_dispatch:        # 也可手动触发
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase (防 Free pause)
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/kv_slot?select=slot_id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}")
+          echo "Supabase ping HTTP $code"
