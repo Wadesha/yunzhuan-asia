@@ -410,7 +410,7 @@
         readNote +
         '<div class="opts">' + hint + optHtml(q) + '</div>' +
         (graded ? fb : '') +
-        '<div class="acts">' + actBtn + '</div></div>';
+        '<div class="acts">' + actBtn + '<button class="btn ghost" data-act="exit">保存并退出</button></div></div>';
     if (autoFire) {
       lastReadId = q.id; reading = true;
       setTimeout(function () { if (quiz.graded[q.id]) return; readAloud(q.q); }, 80);
@@ -507,6 +507,8 @@
         quiz.idx = 0; quiz.sel = {}; quiz.graded = {}; quiz.correct = 0; quiz.wrong = 0; quiz.summary = false;
         render();
       } else if (act === "back") {
+        quiz = null; render();
+      } else if (act === "exit") {
         quiz = null; render();
       } else if (act === "toggle-autoread") {
         autoRead = !autoRead; saveAutoRead(); render();
