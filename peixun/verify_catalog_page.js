@@ -54,10 +54,11 @@ for (const f of bankFiles) {
   } else {
     console.log(`  ${id}: ${got} 题 ✓`);
   }
-  // 首题可解析校验
+  // 首题可解析校验（兼容单选 string 答案与多选 array 答案）
   const first = ex.questions[0];
   const opts = String(first.options).split("|").map(s => s.trim());
-  const ok = opts.length >= 2 && opts.some(o => o.charAt(0) === first.a);
+  const ans = Array.isArray(first.a) ? first.a : [first.a];
+  const ok = opts.length >= 2 && ans.every(A => opts.some(o => o.charAt(0) === A));
   if (!ok) { console.log(`✗ ${id} 首题选项/答案解析异常`); mism++; }
 }
 console.log("真实 bank 题量合计：", bankTotal);
