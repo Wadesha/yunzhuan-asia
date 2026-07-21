@@ -45,7 +45,8 @@
       "font:14px/1.5 sans-serif;display:flex;flex-direction:column;gap:14px;box-shadow:0 12px 40px rgba(0,0,0,.3)}" +
       ".pc-modal-box h3{margin:0;font-size:17px;font-weight:500;color:#2f4858}" +
       ".pc-field{display:flex;flex-direction:column;gap:6px}" +
-      ".pc-field label{font-size:13px;color:#555;font-weight:500}" +
+      ".pc-field label{font-size:13px;color:#555;font-weight:500;display:flex;flex-direction:row;justify-content:space-between;align-items:center}" +
+      ".pc-pin-toggle{background:none;border:0;color:#2f4858;font-size:12px;cursor:pointer;padding:0}" +
       ".pc-field input{border:1.5px solid #d8dce0;border-radius:10px;padding:11px 12px;font-size:16px;" +
       "outline:none;transition:border-color .15s;letter-spacing:1px;width:100%;box-sizing:border-box}" +
       ".pc-field input:focus{border-color:#2f4858}" +
@@ -128,8 +129,8 @@
         '<div class="pc-field" id="f-phone2"><label>再输一遍</label>' +
           '<input id="pc-phone2" type="tel" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="确认手机号">' +
           '<p class="pc-err" id="e-phone2"></p></div>' +
-        '<div class="pc-field" id="f-pin"><label>简单 PIN（可选，云端密码）</label>' +
-          '<input id="pc-pin" type="tel" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="6 位数字，可留空">' +
+        '<div class="pc-field" id="f-pin"><label>简单 PIN（可选，云端密码）<button type="button" class="pc-pin-toggle" id="pc-pin-toggle">显示</button></label>' +
+          '<input id="pc-pin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="6 位数字，可留空">' +
           '<p class="pc-err" id="e-pin"></p></div>' +
         '<div class="pc-actions">' +
           '<button class="pc-btn pc-btn-ghost" id="pc-cancel">取消</button>' +
@@ -143,6 +144,12 @@
       phone.addEventListener("input", function () { onlyDigits(phone, 11); clearErr("phone"); });
       phone2.addEventListener("input", function () { onlyDigits(phone2, 11); clearErr("phone2"); });
       pin.addEventListener("input", function () { onlyDigits(pin, 6); clearErr("pin"); });
+      var pinToggle = m.querySelector("#pc-pin-toggle");
+      if (pinToggle) pinToggle.onclick = function () {
+        var show = pin.type === "password";
+        pin.type = show ? "text" : "password";
+        pinToggle.textContent = show ? "隐藏" : "显示";
+      };
 
       function setErr(field, msg) {
         var f = m.querySelector("#f-" + field), e = m.querySelector("#e-" + field);
@@ -197,8 +204,8 @@
         '<div class="pc-field" id="f-phone"><label>手机号</label>' +
           '<input id="pc-phone" type="tel" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="11 位手机号" value="' + (prefill || "") + '">' +
           '<p class="pc-err" id="e-phone"></p></div>' +
-        '<div class="pc-field" id="f-pin"><label>PIN（若设置）</label>' +
-          '<input id="pc-pin" type="password" autocomplete="off" maxlength="6" placeholder="留空若未设 PIN">' +
+        '<div class="pc-field" id="f-pin"><label>PIN（若设置）<button type="button" class="pc-pin-toggle" id="pc-pin-toggle">显示</button></label>' +
+          '<input id="pc-pin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="留空若未设 PIN">' +
           '<p class="pc-err" id="e-pin"></p></div>' +
         '<div class="pc-actions">' +
           '<button class="pc-btn pc-btn-ghost" id="pc-cancel">取消</button>' +
@@ -212,6 +219,13 @@
         var f = m.querySelector("#f-phone"), e = m.querySelector("#e-phone");
         if (f) f.classList.remove("bad"); if (e) e.textContent = "";
       });
+      var pinInput = m.querySelector("#pc-pin");
+      var pinToggle = m.querySelector("#pc-pin-toggle");
+      if (pinToggle) pinToggle.onclick = function () {
+        var show = pinInput.type === "password";
+        pinInput.type = show ? "text" : "password";
+        pinToggle.textContent = show ? "隐藏" : "显示";
+      };
       function setErr(field, msg) {
         var f = m.querySelector("#f-" + field), e = m.querySelector("#e-" + field);
         if (f) f.classList.add("bad"); if (e) e.textContent = msg;
