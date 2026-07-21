@@ -42,6 +42,23 @@ console.log("lawfin 目录渲染 HTML 含类别名：", html.includes("法律财
 console.log("lawfin 各考试题量：", JSON.stringify(det));
 if (total !== 96) { console.log(`✗ lawfin 真实题合计应为 96，实际 ${total}`); process.exit(1); }
 
+// ---- 医药类（med）真实题检查 ----
+const med = EX.find(c => c.id === "med");
+const medIds = ["doctor","nurse","pharmacist","healthtech"];
+let medTotal = 0; const medDet = {};
+for (const e of med.exams) {
+  const n = (e.questions || []).length;
+  medDet[e.id] = n; medTotal += n;
+  if (medIds.includes(e.id) && n < 5) { console.log(`✗ ${e.id} 题量过少：${n}`); process.exit(1); }
+}
+console.log("med 各考试题量：", JSON.stringify(medDet));
+if (medTotal !== 96) { console.log(`✗ med 真实题合计应为 96，实际 ${medTotal}`); process.exit(1); }
+
+// 全目录总题量
+let all = 0; EX.forEach(c => c.exams.forEach(e => { all += (e.questions || []).length; }));
+if (all !== 252) { console.log(`✗ catalog 总题量应为 252，实际 ${all}`); process.exit(1); }
+console.log("catalog 总题量：", all);
+
 // 进入 lawyer 考试：直接驱动 startQuiz 不可达（IIFE 内），改为校验 EXAMS 首题可被 parseOptions 正确解析
 const first = lawfin.exams.find(e=>e.id==="lawyer").questions[0];
 const opts = String(first.options).split("|").map(s=>s.trim());
@@ -49,4 +66,9 @@ const ok = opts.length>=2 && opts.some(o=>o.charAt(0)===first.a);
 if (!ok) { console.log("✗ lawyer 首题选项/答案解析异常"); process.exit(1); }
 console.log("lawyer 首题：", first.q.slice(0,18)+"...", "选项", opts.length, "答案", first.a);
 
-console.log("\n✓ 页面级加载与 lawfin 真实题库就位验证通过（96 题）");
+// 校验 med 首题可解析
+const firstMed = med.exams.find(e=>e.id==="doctor").questions[0];
+const mopts = String(firstMed.options).split("|").map(s=>s.trim());
+if (!(mopts.length>=2 && mopts.some(o=>o.charAt(0)===firstMed.a))) { console.log("✗ doctor 首题解析异常"); process.exit(1); }
+
+console.log("\n✓ 页面级加载与真实题库就位验证通过（lawfin 96 + med 96 = 192 题）");
