@@ -36,6 +36,8 @@
   var backend = LocalBackend;
 
   var Store = {
+    // 默认本地后端引用（logout 时退回用）
+    _local: LocalBackend,
     // 切换后端（以后接 Supabase 时调用 Store.use(SupabaseBackend)）
     use: function (b) { if (b) backend = b; return backend; },
     backendName: function () { return backend.name; },
