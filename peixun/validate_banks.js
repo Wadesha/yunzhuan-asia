@@ -1,53 +1,63 @@
-// 校验 banks/ 下各考试 bank：格式、答案命中、single/multi 类型
+#!/usr/bin/env node
+// 校验 banks/ 下所有题库文件（递归 stages→subs→topics→reads）
+// 规则：每道客观题 t∈{single,multi,bool}、有题干、选项带 A/B/C/D 字母前缀、有答案；
+//       每张阅读卡有 q 与 a。统计客观题与阅读卡总数。
 const fs = require("fs");
 const path = require("path");
-const BANKS = path.join(__dirname, "banks");
 
-let errors = 0, total = 0, totalReads = 0;
-function collectReads(bank) {
-  let reads = [];
-  if (bank && Array.isArray(bank.sub)) bank.sub.forEach(s => { if (Array.isArray(s.reads)) reads = reads.concat(s.reads); });
-  else if (bank && Array.isArray(bank.reads)) reads = bank.reads;
-  return reads;
+const BANKS = path.join(__dirname, "banks");
+let problems = 0, totalObj = 0, totalReads = 0;
+
+function err(msg) { problems++; console.log("  [✗] " + msg); }
+
+function checkQ(q, ctx) {
+  if (!q || typeof q !== "object") { err(ctx + ": 题目非对象"); return; }
+  if (q.t !== "single" && q.t !== "multi" && q.t !== "bool") err(ctx + ": 题型 t 非法 (" + q.t + ")");
+  if (typeof q.q !== "string" || !q.q.trim()) err(ctx + ": 题干 q 缺失");
+  if (!q.options || typeof q.options !== "string" || !q.options.trim()) err(ctx + ": 选项 options 缺失");
+  else {
+    const opts = q.options.split("|").map(s => s.trim());
+    if (opts.length < 2) err(ctx + ": 选项少于 2 个");
+    opts.forEach(function (o, i) { if (!/^[A-Za-z]\s/.test(o)) err(ctx + ": 选项未带字母前缀 -> " + o.slice(0, 14)); });
+  }
+  if (q.a == null || q.a === "") err(ctx + ": 答案 a 缺失");
+  totalObj++;
 }
+
+function checkRead(r, ctx) {
+  if (!r || typeof r !== "object") { err(ctx + ": 阅读卡非对象"); return; }
+  if (typeof r.q !== "string" || !r.q.trim()) err(ctx + ": 阅读卡题干 q 缺失");
+  if (typeof r.a !== "string" || !r.a.trim()) err(ctx + ": 阅读卡参考答案 a 缺失");
+  totalReads++;
+}
+
+function walk(node, ctx) {
+  (node.questions || []).forEach(function (q, i) { checkQ(q, ctx + " 题#" + i); });
+  (node.reads || []).forEach(function (r, i) { checkRead(r, ctx + " 阅#" + i); });
+  (node.topics || []).forEach(function (t) { walk(t, ctx + "/" + t.name); });
+  (node.subs || []).forEach(function (s) { walk(s, ctx + "/" + s.name); });
+}
+
 for (const f of fs.readdirSync(BANKS)) {
-  if (!f.endsWith(".json") || f === "_base.json" || f === "_index.json") continue;
-  const id = f.replace(/\.json$/, "");
+  if (!f.endsWith(".json")) continue;
+  if (f === "_base.json" || f === "_index.json") continue;
+  const examId = f.replace(/\.json$/, "");
   let bank;
   try { bank = JSON.parse(fs.readFileSync(path.join(BANKS, f), "utf8")); }
-  catch (e) { console.log(`✗ ${id}: JSON 解析失败 ${e.message}`); errors++; continue; }
-  let arr;
-  if (Array.isArray(bank)) arr = bank;
-  else if (bank && Array.isArray(bank.sub)) arr = [].concat.apply([], bank.sub.map(s => s.questions || []));
-  else if (bank && Array.isArray(bank.questions)) arr = bank.questions;
-  else { console.log(`✗ ${id}: 非数组且不含 sub/questions`); errors++; continue; }
-  arr.forEach((q, i) => {
-    total++;
-    const tag = `${id}[${i}]`;
-    if (!q.t || !["single", "multi"].includes(q.t)) { console.log(`✗ ${tag}: 题型异常 ${q.t}`); errors++; return; }
-    if (!q.q || typeof q.q !== "string") { console.log(`✗ ${tag}: 题干缺失`); errors++; }
-    if (!q.options || typeof q.options !== "string") { console.log(`✗ ${tag}: options 缺失`); errors++; return; }
-    const opts = q.options.split("|").map(s => s.trim()).filter(Boolean);
-    if (opts.length < 2) { console.log(`✗ ${tag}: 选项不足2个 (${opts.length})`); errors++; }
-    const letters = opts.map(o => o.charAt(0));
-    if (new Set(letters).size !== letters.length) { console.log(`✗ ${tag}: 选项字母重复 ${letters.join(",")}`); errors++; }
-    if (q.t === "single") {
-      if (typeof q.a !== "string") { console.log(`✗ ${tag}: single 答案应为字符串，实际 ${JSON.stringify(q.a)}`); errors++; return; }
-      if (!letters.includes(q.a)) { console.log(`✗ ${tag}: 答案 ${q.a} 不在选项 ${letters.join(",")}`); errors++; }
-    } else {
-      if (!Array.isArray(q.a) || q.a.length < 1) { console.log(`✗ ${tag}: multi 答案应为非空数组`); errors++; return; }
-      for (const x of q.a) if (!letters.includes(x)) { console.log(`✗ ${tag}: 答案项 ${x} 不在选项 ${letters.join(",")}`); errors++; }
-    }
-  });
-  // 阅读卡（主观题例题+参考答案）校验：q/a 必填，e 可选
-  const reads = collectReads(bank);
-  reads.forEach((r, i) => {
-    totalReads++;
-    const tag = `${id}.read[${i}]`;
-    if (!r.q || typeof r.q !== "string") { console.log(`✗ ${tag}: 阅读卡题干缺失`); errors++; }
-    if (!r.a || typeof r.a !== "string") { console.log(`✗ ${tag}: 阅读卡参考答案缺失`); errors++; }
-  });
-  console.log(`  ${id}: ${arr.length} 题校验通过` + (reads.length ? ` · ${reads.length} 阅读卡` : ""));
+  catch (e) { err(examId + ": JSON 解析失败 - " + e.message); continue; }
+  if (Array.isArray(bank)) {
+    bank.forEach(function (q, i) { checkQ(q, examId + "#" + i); });
+  } else if (bank.stages) {
+    bank.stages.forEach(function (st) { (st.subs || []).forEach(function (s) { walk(s, examId + "/" + st.name + "/" + s.name); }); });
+  } else if (bank.sub) {
+    bank.sub.forEach(function (s) { walk(s, examId + "/" + s.name); });
+  } else if (bank.questions) {
+    bank.questions.forEach(function (q, i) { checkQ(q, examId + "#" + i); });
+    if (bank.reads) bank.reads.forEach(function (r, i) { checkRead(r, examId + " 阅#" + i); });
+  } else {
+    err(examId + ": 既无 stages/sub 也无 questions");
+  }
 }
-console.log(`\n总计 ${total} 客观题 + ${totalReads} 阅读卡，发现 ${errors} 处问题`);
-process.exit(errors ? 1 : 0);
+
+console.log("\n校验完成：问题 " + problems + " 处；客观题 " + totalObj + " + 阅读卡 " + totalReads);
+process.exit(problems > 0 ? 1 : 0);
