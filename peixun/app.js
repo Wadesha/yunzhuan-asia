@@ -28,7 +28,7 @@
       var total = quiz.list.length; if (!total) return;
       var acc = Math.round(100 * quiz.correct / total);
       var a = Sget(ATTEMPT_KEY); if (!Array.isArray(a)) a = [];
-      a.unshift({ ts: Date.now(), catId: quiz.catId, examId: quiz.examId, subId: quiz.subId,
+      a.unshift({ ts: Date.now(), catId: quiz.catId, examId: quiz.examId, ids: quiz.ids,
                   total: total, correct: quiz.correct, wrong: quiz.wrong, acc: acc });
       if (a.length > 50) a.length = 50;
       Sset(ATTEMPT_KEY, a);
@@ -148,7 +148,7 @@
   function readAnswer(q) {
     if (!synth) return;
     var isCor = grade(q, quiz.sel[q.id]);
-    readAloud((isCor ? "回答正确。" : "回答错误。") + "正确答案：" + correctText(q));
+    readAloud(correctText(q));
   }
 
   /* ---------- 当前刷题会话 ---------- */
@@ -165,13 +165,21 @@
     if (exam.sub) exam.sub.forEach(function (s) { if (s.reads) n += s.reads.length; });
     return n;
   }
-  function gatherReads(cat, exam, subId) {
+  function gatherReads(cat, exam, ids) {
+    ids = ids || [];
     var list = [];
     function pushFrom(arr, ctx) { (arr || []).forEach(function (r, i) { list.push({ q: r.q, a: r.a, e: r.e || null, key: ctx + "/" + i }); }); }
-    if (subId) { var s = findSub(exam, subId); if (s) pushFrom(s.reads, cat.id + "/" + exam.id + "/" + s.id); }
-    else {
+    function collect(node, ctx) {
+      pushFrom(node.reads, ctx);
+      childrenOf(node).forEach(function (c) { collect(c, ctx + "/" + c.id); });
+    }
+    if (ids.length === 0) {
       pushFrom(exam.reads, cat.id + "/" + exam.id);
-      if (exam.sub) exam.sub.forEach(function (s) { pushFrom(s.reads, cat.id + "/" + exam.id + "/" + s.id); });
+      examTopLevel(exam).forEach(function (n) { collect(n, cat.id + "/" + exam.id + "/" + n.id); });
+    } else {
+      var r = resolvePath(exam, ids);
+      if (!r || !r.current) return list;
+      collect(r.current, pathKey(cat.id, exam.id, ids));
     }
     return list;
   }
@@ -189,11 +197,51 @@
     for (var i = 0; i < exam.sub.length; i++) if (exam.sub[i].id === subId) return exam.sub[i];
     return null;
   }
-  function startQuiz(catId, examId, subId) {
+  // ---- 四层导航：考试→阶段→科目→知识点（任意层可选）----
+  function examTopLevel(exam) {
+    if (exam.stages && exam.stages.length) return exam.stages;
+    if (exam.sub && exam.sub.length) return exam.sub;
+    if (exam.questions && exam.questions.length) return [exam];
+    return [];
+  }
+  function childrenOf(node) { return (node.subs || node.topics || []); }
+  function resolvePath(exam, ids) {
+    var arr = examTopLevel(exam), chain = [];
+    for (var i = 0; i < ids.length; i++) {
+      var found = null;
+      for (var j = 0; j < arr.length; j++) if (arr[j].id === ids[i]) { found = arr[j]; break; }
+      if (!found) return null;
+      chain.push(found); arr = childrenOf(found);
+    }
+    return { chain: chain, current: ids.length ? chain[chain.length - 1] : null, top: examTopLevel(exam) };
+  }
+  function nodeQuestions(node) { return node.questions || []; }
+  function descendantQCount(node) {
+    var n = (node.questions || []).length;
+    childrenOf(node).forEach(function (c) { n += descendantQCount(c); });
+    return n;
+  }
+  function descendantReadCount(node) {
+    var n = (node.reads ? node.reads.length : 0);
+    childrenOf(node).forEach(function (c) { n += descendantReadCount(c); });
+    return n;
+  }
+  function countReadsExam(exam) {
+    var n = exam.reads ? exam.reads.length : 0;
+    examTopLevel(exam).forEach(function (s) { n += descendantReadCount(s); });
+    return n;
+  }
+  function pathKey(catId, examId, ids) { return catId + "/" + examId + (ids && ids.length ? "/" + ids.join("/") : ""); }
+  function pathEq(a, b) { a = a || []; b = b || []; if (a.length !== b.length) return false; for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
+
+  function startQuiz(catId, examId, ids) {
+    ids = ids || [];
     var cat = findCat(catId), exam = findExam(cat, examId);
     if (!exam) return;
-    var source = findSub(exam, subId) || exam;
-    var qs = source.questions || [];
+    var r = resolvePath(exam, ids);
+    var node = r ? r.current : null;
+    var source = node || exam;
+    var qs = nodeQuestions(source);
     if (!qs.length) return;
     var list = qs.map(function (q, i) {
       return {
@@ -205,11 +253,13 @@
           ? (Array.isArray(q.a) ? q.a : String(q.a).split("|").map(function (x) { return x.trim(); }))
           : (Array.isArray(q.a) ? q.a[0] : q.a),
         exp: q.e || null,
-        qkey: catId + "/" + examId + (subId ? "/" + subId : "") + "/" + i
+        qkey: pathKey(catId, examId, ids) + "/" + i
       };
     });
-    quiz = { catId: catId, examId: examId, subId: subId || null, list: list, idx: 0, sel: {}, graded: {}, correct: 0, wrong: 0, attempted: false };
+    quiz = { catId: catId, examId: examId, ids: ids.slice(), list: list, idx: 0, sel: {}, graded: {}, correct: 0, wrong: 0, attempted: false };
     lastReadId = null;
+    // 同步 URL hash，否则 render() 按 route.ids（阶段层）判定不匹配 quiz.ids（科目层），会重渲染目录页而不进题目
+    location.hash = "#/exam/" + catId + "/" + examId + (ids.length ? "/" + ids.join("/") : "");
     render();
   }
   function doGrade(q) {
@@ -224,27 +274,30 @@
   function Sget(k){ if(window.Store) return window.Store.get(k); try { return JSON.parse(localStorage.getItem(k) || "null"); } catch(e){ return null; } }
   function Sset(k,v){ if(window.Store) return window.Store.set(k,v); try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
   function Srem(k){ if(window.Store) return window.Store.remove(k); try { localStorage.removeItem(k); } catch(e){} }
-  function progressKey(catId, examId, subId) {
-    return "peixun_quiz_v1_" + catId + "_" + examId + (subId ? "_" + subId : "");
+  function progressKey(catId, examId, ids) {
+    var suf = "";
+    if (Array.isArray(ids) && ids.length) suf = "_" + ids.join("_");
+    else if (typeof ids === "string" && ids) suf = "_" + ids;
+    return "peixun_quiz_v1_" + catId + "_" + examId + suf;
   }
   function saveQuizProgress() {
     try {
       if (!quiz) return;
-      Sset(progressKey(quiz.catId, quiz.examId), {
+      Sset(progressKey(quiz.catId, quiz.examId, quiz.ids), {
         idx: quiz.idx, sel: quiz.sel, graded: quiz.graded,
         correct: quiz.correct, wrong: quiz.wrong, ts: Date.now()
       });
     } catch (e) {}
   }
-  function loadQuizProgress(catId, examId) {
+  function loadQuizProgress(catId, examId, ids) {
     try {
-      var p = Sget(progressKey(catId, examId));
+      var p = Sget(progressKey(catId, examId, ids));
       if (!p) return null;
       return p;
     } catch (e) { return null; }
   }
-  function clearQuizProgress(catId, examId) {
-    try { Srem(progressKey(catId, examId)); } catch (e) {}
+  function clearQuizProgress(catId, examId, ids) {
+    try { Srem(progressKey(catId, examId, ids)); } catch (e) {}
   }
 
   /* ---------- 渲染：选项 ---------- */
@@ -333,27 +386,30 @@
     var h = location.hash.replace(/^#\/?/, "");
     var parts = h.split("/").filter(Boolean);
     if (parts[0] === "cat" && parts[1]) return { view: "cat", catId: parts[1] };
-    if (parts[0] === "exam" && parts[1] && parts[2]) return { view: "exam", catId: parts[1], examId: parts[2] };
-    if (parts[0] === "read" && parts[1] && parts[2]) return { view: "read", catId: parts[1], examId: parts[2], subId: parts[3] || null };
+    if (parts[0] === "exam" && parts[1] && parts[2]) return { view: "exam", catId: parts[1], examId: parts[2], ids: parts.slice(3) };
+    if (parts[0] === "read" && parts[1] && parts[2]) return { view: "read", catId: parts[1], examId: parts[2], ids: parts.slice(3) };
     return { view: "home" };
   }
 
   function renderRead(route) {
     var cat = findCat(route.catId), exam = findExam(cat, route.examId);
     if (!exam) { location.hash = "#/cat/" + route.catId; return; }
-    var list = gatherReads(cat, exam, route.subId);
-    if (!list.length) { location.hash = "#/exam/" + route.catId + "/" + route.examId; return; }
-    var idx = readState && readState.catId === route.catId && readState.examId === route.examId && readState.subId === (route.subId || null)
+    var ids = route.ids || [];
+    var list = gatherReads(cat, exam, ids);
+    if (!list.length) { location.hash = "#/exam/" + route.catId + "/" + route.examId + (ids.length ? "/" + ids.join("/") : ""); return; }
+    var idx = (readState && readState.catId === route.catId && readState.examId === route.examId && pathEq(readState.ids, ids))
       ? Math.min(readState.idx, list.length - 1) : 0;
-    readState = { catId: route.catId, examId: route.examId, subId: route.subId || null, list: list, idx: idx };
+    readState = { catId: route.catId, examId: route.examId, ids: ids, list: list, idx: idx };
     var card = list[idx];
     var favs = loadReadFavs();
     var faved = favs.indexOf(card.key) >= 0;
-    var subName = route.subId && findSub(exam, route.subId) ? findSub(exam, route.subId).name : "";
-    var title = exam.name + (subName ? " · " + subName : "");
+    var nodeName = "";
+    if (ids.length) { var rr = resolvePath(exam, ids); if (rr && rr.current) nodeName = rr.chain.map(function (n) { return n.name; }).join(" / "); }
+    var title = exam.name + (nodeName ? " · " + nodeName : "");
+    var backHash = "#/exam/" + cat.id + "/" + exam.id + (ids.length ? "/" + ids.join("/") : "");
     document.getElementById("app").innerHTML =
       '<p class="crumb"><a href="#">职业资格考试</a> / <a href="#/cat/' + cat.id + '">' + esc(cat.name) + '</a> / <a href="#/exam/' + cat.id + '/' + exam.id + '">' + esc(exam.name) + '</a> / 阅读卡</p>' +
-      '<div class="modnav"><a href="#/exam/' + cat.id + '/' + exam.id + '">返回考试</a></div>' +
+      '<div class="modnav"><a href="' + backHash + '">返回</a></div>' +
       '<h1 class="page-title">主观题 / 例题 参考答案</h1>' +
       '<p class="page-sub">' + esc(title) + ' · 第 ' + (idx + 1) + ' / ' + list.length + ' 张（不计分，供背诵与对照）</p>' +
       '<div class="q read-card"><div class="qt">' + esc(card.q) + '</div>' +
@@ -418,19 +474,28 @@
 
   function allQkeys(catId, exam) {
     var keys = [];
-    if (exam.sub && exam.sub.length) {
-      exam.sub.forEach(function (s) {
-        (s.questions || []).forEach(function (_, i) { keys.push(catId + "/" + exam.id + "/" + s.id + "/" + i); });
-      });
-    } else {
-      (exam.questions || []).forEach(function (_, i) { keys.push(catId + "/" + exam.id + "/" + i); });
+    function walk(node, prefix) {
+      (node.questions || []).forEach(function (_, i) { keys.push(prefix + "/" + i); });
+      childrenOf(node).forEach(function (c) { walk(c, prefix + "/" + c.id); });
     }
+    examTopLevel(exam).forEach(function (n) { walk(n, catId + "/" + exam.id + "/" + n.id); });
     return keys;
   }
 
-  function renderExamDetail(route) {
+  function renderTree(route) {
     var cat = findCat(route.catId), exam = findExam(cat, route.examId);
     if (!exam) { location.hash = "#/cat/" + route.catId; return; }
+    var ids = route.ids || [];
+    var children, curNode = null, breadcrumb = [exam.name];
+    if (ids.length === 0) {
+      children = examTopLevel(exam);
+    } else {
+      var r = resolvePath(exam, ids);
+      if (!r) { location.hash = "#/cat/" + route.catId; return; }
+      curNode = r.current;
+      breadcrumb = r.chain.map(function (n) { return n.name; });
+      children = childrenOf(curNode);
+    }
     var qkeys = allQkeys(route.catId, exam);
     var prog = userProgress(qkeys);
     var chip = function (arr, label) {
@@ -439,44 +504,69 @@
         arr.map(function (x) { return '<span class="chip on">' + esc(x) + '</span>'; }).join("") + '</div>';
     };
     var body;
-    if (exam.quiz === false) {
-      body = '<div class="q"><div class="qt">该考试以实操考核为主体，非纯笔试形态，本目录仅作信息列举。</div>' +
-        (exam.note ? '<div class="hint">' + esc(exam.note) + '</div>' : '') + '</div>';
-    } else if (exam.sub && exam.sub.length) {
-      var subs = exam.sub.map(function (s) {
-        var qn = s.questions ? s.questions.length : 0;
-        if (!qn) return "";
-        var p = loadQuizProgress(cat.id, exam.id, s.id);
-        var resume = p ? '<button class="btn" data-act="resume-quiz" data-cat="' + cat.id + '" data-exam="' + exam.id + '" data-sub="' + s.id + '">继续上次（第 ' + Math.min(p.idx + 1, qn) + '/' + qn + '）</button>' : '';
-        var startTxt = p ? '重新开始' : ('开始刷题（' + qn + ' 题）');
-        return '<div class="subcard"><div class="sub-name">' + esc(s.name) + '</div>' +
-          '<div class="sub-meta">' + qn + ' 题</div>' +
-          '<div class="acts">' + resume +
-          '<button class="btn primary" data-act="start-quiz" data-cat="' + cat.id + '" data-exam="' + exam.id + '" data-sub="' + s.id + '">' + startTxt + '</button></div></div>';
-      }).join("");
-      body = '<div class="section-h">分科刷题</div><div class="subs">' + subs + '</div>';
+    if (children.length) {
+      body = renderNodeList(cat, exam, ids, children);
     } else {
-      var qn = exam.questions ? exam.questions.length : 0;
-      var p = loadQuizProgress(cat.id, exam.id);
-      body = (p ? '<div class="acts"><button class="btn" data-act="resume-quiz" data-cat="' + cat.id + '" data-exam="' + exam.id + '">继续上次（第 ' + Math.min(p.idx + 1, qn) + ' / ' + qn + ' 题）</button></div>' : '') +
-        '<div class="acts"><button class="btn primary" data-act="start-quiz" data-cat="' + cat.id +
-        '" data-exam="' + exam.id + '">' + (p ? "重新开始" : ("开始刷题（" + qn + ' 题）')) + '</button></div>';
+      body = renderLeaf(cat, exam, ids, curNode || exam);
     }
-    var introHtml = exam.intro ? '<div class="infobox intro"><div class="ib-h">考试介绍</div><div class="ib-b">' + esc(exam.intro) + '</div></div>' : "";
-    var benefitHtml = exam.benefit ? '<div class="infobox benefit"><div class="ib-h">通过的好处</div><div class="ib-b">' + esc(exam.benefit) + '</div></div>' : "";
+    var introHtml = (ids.length === 0 && exam.intro) ? '<div class="infobox intro"><div class="ib-h">考试介绍</div><div class="ib-b">' + esc(exam.intro) + '</div></div>' : "";
+    var benefitHtml = (ids.length === 0 && exam.benefit) ? '<div class="infobox benefit"><div class="ib-h">通过的好处</div><div class="ib-b">' + esc(exam.benefit) + '</div></div>' : "";
+    var crumbTrail = breadcrumb.slice(1).map(function (n) { return esc(n); }).join(" &rsaquo; ");
+    var readsHere = ids.length ? descendantReadCount(curNode || exam) : countReadsExam(exam);
     document.getElementById("app").innerHTML =
-      '<p class="crumb"><a href="#">职业资格考试</a> / <a href="#/cat/' + cat.id + '">' + esc(cat.name) + '</a> / ' + esc(exam.name) + '</p>' +
+      '<p class="crumb"><a href="#">职业资格考试</a> / <a href="#/cat/' + cat.id + '">' + esc(cat.name) + '</a>' + (crumbTrail ? ' / ' + crumbTrail : '') + '</p>' +
       '<div class="modnav"><a href="#">刷题目录</a><a href="jianhu/">监护刷题</a><a href="wuxiandian/">业余无线电刷题</a></div>' +
       '<h1 class="page-title">' + esc(exam.name) + '</h1>' +
-      '<p class="page-sub">组织：' + esc(exam.body || "—") + (exam.site ? ' · 官网：' + esc(exam.site) : '') + '</p>' +
+      (ids.length === 0 ? ('<p class="page-sub">组织：' + esc(exam.body || "—") + (exam.site ? ' · 官网：' + esc(exam.site) : '') + '</p>') : '') +
       (exam.intro || exam.benefit ? '<div class="info-wrap">' + introHtml + benefitHtml + '</div>' : '') +
-      '<div class="notebox">开始刷题后 <b>判分会自动朗读正确答案</b>；做题记录在<b>登录云端账号后随手机同步</b>（未登录则仅存本机）。进度支持「继续上次」。</div>' +
-      chip(exam.levels, "层级 / 阶段") +
-      (exam.sub && exam.sub.length ? "" : chip(exam.subjects, "主要科目")) +
+      '<div class="notebox">进入任一' + (ids.length === 0 ? '阶段 / 科目' : '下一级') + '即只刷该部分题目；判分后<b>自动朗读正确答案</b>；进度按' + (ids.length === 0 ? '科目' : '当前层级') + '分别保存并可「继续上次」。</div>' +
+      (ids.length === 0 ? chip(exam.levels, "层级 / 阶段") : "") +
+      (ids.length === 0 && (!exam.stages) ? chip(exam.subjects, "主要科目") : "") +
       (exam.quiz === false ? "" : '<div class="section-h">朗读</div><div class="chips"><span class="chip' + (autoRead ? " on" : "") + '" data-act="toggle-autoread">自动朗读题干：' + (autoRead ? "开" : "关") + '</span></div>') +
       body +
-      (exam.quiz === false ? "" : '<div class="hint">进度：已答 ' + prog.done + ' / 共 ' + prog.total + '，掌握 ' + prog.cor + '。' + (exam.sub && exam.sub.length ? ' 分科进度各自保存。' : (p ? ' 已保存上次刷题进度，可「继续上次」或「重新开始」。' : '')) + ' 做题记录随登录的云端账号同步。</div>') +
-      (countReads(exam) ? '<div class="section-h">主观题 / 例题</div><div class="acts"><a class="btn" href="#/read/' + cat.id + '/' + exam.id + '">📖 阅读参考答案（' + countReads(exam) + ' 张）</a></div>' : '');
+      (exam.quiz === false ? "" : '<div class="hint">总进度：已答 ' + prog.done + ' / 共 ' + prog.total + '，掌握 ' + prog.cor + '。做题记录随登录的云端账号同步。</div>') +
+      (readsHere ? '<div class="section-h">主观题 / 例题（阅读卡）</div><div class="acts"><a class="btn" href="#/read/' + cat.id + '/' + exam.id + (ids.length ? '/' + ids.join("/") : '') + '">📖 阅读参考答案（' + readsHere + ' 张）</a></div>' : '');
+  }
+
+  function renderNodeList(cat, exam, ids, children) {
+    var cards = children.map(function (ch) {
+      var qn = descendantQCount(ch);
+      var rn = descendantReadCount(ch);
+      var hasKids = childrenOf(ch).length > 0;
+      var childIds = ids.concat([ch.id]);
+      var p = loadQuizProgress(cat.id, exam.id, childIds);
+      var acts = "";
+      if (hasKids) {
+        acts = '<a class="btn primary" href="#/exam/' + cat.id + '/' + exam.id + '/' + childIds.join("/") + '">进入（' + qn + ' 题）</a>';
+      } else {
+        if (qn > 0) {
+          var resume = p ? '<button class="btn" data-act="resume-quiz" data-cat="' + cat.id + '" data-exam="' + exam.id + '" data-ids="' + childIds.join(",") + '">继续上次（第 ' + Math.min(p.idx + 1, qn) + '/' + qn + '）</button>' : '';
+          acts += resume + '<button class="btn primary" data-act="start-quiz" data-cat="' + cat.id + '" data-exam="' + exam.id + '" data-ids="' + childIds.join(",") + '">' + (p ? "重新开始" : ("开始刷题（" + qn + " 题）")) + '</button>';
+        }
+        if (rn > 0) acts += '<a class="btn ghost" href="#/read/' + cat.id + '/' + exam.id + '/' + childIds.join("/") + '">📖 阅读卡（' + rn + '）</a>';
+      }
+      return '<div class="subcard"><div class="sub-name">' + esc(ch.name) + '</div>' +
+        '<div class="sub-meta">' + (qn ? qn + ' 题' : '') + (rn ? (qn ? ' · ' : '') + rn + ' 阅' : '') + '</div>' +
+        '<div class="acts">' + acts + '</div></div>';
+    }).join("");
+    var label = ids.length === 0 ? (exam.stages && exam.stages.length ? "选择阶段" : "选择科目") : "选择下一级";
+    return '<div class="section-h">' + label + '</div><div class="subs">' + cards + '</div>';
+  }
+
+  function renderLeaf(cat, exam, ids, node) {
+    var qn = descendantQCount(node);
+    var rn = descendantReadCount(node);
+    var p = loadQuizProgress(cat.id, exam.id, ids);
+    var acts = "";
+    var lvlName = ids.length >= 3 ? "知识点" : (ids.length === 2 ? "科目" : "阶段");
+    if (qn > 0) {
+      var resume = p ? '<button class="btn" data-act="resume-quiz" data-cat="' + cat.id + '" data-exam="' + exam.id + '" data-ids="' + ids.join(",") + '">继续上次（第 ' + Math.min(p.idx + 1, qn) + '/' + qn + '）</button>' : '';
+      acts += resume + '<button class="btn primary" data-act="start-quiz" data-cat="' + cat.id + '" data-exam="' + exam.id + '" data-ids="' + ids.join(",") + '">' + (p ? "重新开始" : ("开始刷题（" + qn + " 题）")) + '</button>';
+    }
+    if (rn > 0) acts += '<a class="btn ghost" href="#/read/' + cat.id + '/' + exam.id + '/' + ids.join("/") + '">📖 阅读参考答案（' + rn + ' 张）</a>';
+    return '<div class="section-h">' + esc(node.name) + '</div>' +
+      '<div class="q"><div class="qt">本' + lvlName + '共 <b>' + qn + '</b> 道客观题' + (rn ? '，另含 <b>' + rn + '</b> 张阅读卡' : '') + '。点击开始即只刷这部分题目。</div></div>' +
+      '<div class="acts">' + acts + '</div>';
   }
 
   function renderQuiz() {
@@ -523,7 +613,7 @@
 
   function renderSummary() {
     recordAttempt();
-    clearQuizProgress(quiz.catId, quiz.examId);
+    clearQuizProgress(quiz.catId, quiz.examId, quiz.ids);
     var total = quiz.list.length;
     var acc = total ? Math.round(100 * quiz.correct / total) : 0;
     document.getElementById("app").innerHTML =
@@ -541,12 +631,12 @@
   function render() {
     var route = parseHash();
     if (route.view === "read") { renderRead(route); return; }
-    // 若正在该考试刷题，且路由仍在该考试，则渲染题目/总结
-    if (quiz && route.view === "exam" && route.catId === quiz.catId && route.examId === quiz.examId) {
+    // 若正在刷题且路由仍在同一路径，则渲染题目/总结
+    if (quiz && route.view === "exam" && route.catId === quiz.catId && route.examId === quiz.examId && pathEq(route.ids, quiz.ids)) {
       if (quiz.summary) { renderSummary(); return; }
       renderQuiz(); return;
     }
-    if (route.view === "exam") { renderExamDetail(route); return; }
+    if (route.view === "exam") { renderTree(route); return; }
     if (route.view === "cat") { renderCat(route); return; }
     renderHome();
   }
@@ -584,13 +674,17 @@
       }
       var act = t.getAttribute("data-act");
       if (act === "start-quiz") {
-        var _sc = t.getAttribute("data-cat"), _se = t.getAttribute("data-exam"), _ss = t.getAttribute("data-sub") || null;
-        clearQuizProgress(_sc, _se, _ss);
-        startQuiz(_sc, _se, _ss);
+        var _sc = t.getAttribute("data-cat"), _se = t.getAttribute("data-exam");
+        var _sd = t.getAttribute("data-ids");
+        var _ids = _sd ? _sd.split(",") : [];
+        clearQuizProgress(_sc, _se, _ids);
+        startQuiz(_sc, _se, _ids);
       } else if (act === "resume-quiz") {
-        var rc = t.getAttribute("data-cat"), re = t.getAttribute("data-exam"), rs = t.getAttribute("data-sub") || null;
-        var rp = loadQuizProgress(rc, re, rs); if (!rp) return;
-        startQuiz(rc, re, rs);
+        var rc = t.getAttribute("data-cat"), re = t.getAttribute("data-exam");
+        var _rd = t.getAttribute("data-ids");
+        var _rids = _rd ? _rd.split(",") : [];
+        var rp = loadQuizProgress(rc, re, _rids); if (!rp) return;
+        startQuiz(rc, re, _rids);
         quiz.idx = Math.min(rp.idx || 0, quiz.list.length - 1);
         quiz.sel = rp.sel || {}; quiz.graded = rp.graded || {};
         quiz.correct = rp.correct || 0; quiz.wrong = rp.wrong || 0;
@@ -609,13 +703,19 @@
         render();
         saveQuizProgress();
       } else if (act === "again") {
-        clearQuizProgress(quiz.catId, quiz.examId);
+        clearQuizProgress(quiz.catId, quiz.examId, quiz.ids);
         quiz.idx = 0; quiz.sel = {}; quiz.graded = {}; quiz.correct = 0; quiz.wrong = 0; quiz.summary = false;
         render();
       } else if (act === "back") {
-        quiz = null; render();
+        var _bc = quiz.catId, _be = quiz.examId;
+        quiz = null;
+        location.hash = "#/exam/" + _bc + "/" + _be;
+        render();
       } else if (act === "exit") {
-        quiz = null; render();
+        var _xc = quiz.catId, _xe = quiz.examId;
+        quiz = null;
+        location.hash = "#/exam/" + _xc + "/" + _xe;
+        render();
       } else if (act === "toggle-autoread") {
         autoRead = !autoRead; saveAutoRead(); render();
       } else if (act === "show-ans") {
@@ -633,7 +733,7 @@
       } else if (act === "prev-read") {
         if (readState) { readState.idx = Math.max(readState.idx - 1, 0); render(); }
       } else if (act === "read-done") {
-        location.hash = "#/exam/" + (readState ? readState.catId : "") + "/" + (readState ? readState.examId : "");
+        location.hash = "#/exam/" + (readState ? readState.catId : "") + "/" + (readState ? readState.examId : "") + (readState && readState.ids && readState.ids.length ? "/" + readState.ids.join("/") : "");
       } else if (act === "read") {
         if (reading) { stopRead(); reading = false; renderReadBtn(); }
         else { readAloud(quiz.list[quiz.idx].q); reading = true; lastReadId = quiz.list[quiz.idx].id; renderReadBtn(); }
