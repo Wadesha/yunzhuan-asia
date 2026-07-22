@@ -40,14 +40,25 @@ const bankFiles = fs.readdirSync(BANKS)
   .filter(f => f.endsWith(".json") && f !== "_base.json" && f !== "_index.json");
 
 let bankTotal = 0, mism = 0;
+// 递归统计任意树形 bank 的客观题总数（支持 Array / {questions} / {sub} / {stages→subs→topics}）
+function countQuestions(node) {
+  if (!node) return 0;
+  if (Array.isArray(node)) return node.reduce((n, q) => n + (q && (q.t || q.q) ? 1 : 0), 0);
+  let n = 0;
+  if (Array.isArray(node.questions)) n += countQuestions(node.questions);
+  if (Array.isArray(node.sub)) n += node.sub.reduce((s, x) => s + countQuestions(x), 0);
+  if (Array.isArray(node.subs)) n += node.subs.reduce((s, x) => s + countQuestions(x), 0);
+  if (Array.isArray(node.stages)) n += node.stages.reduce((s, x) => s + countQuestions(x), 0);
+  if (Array.isArray(node.topics)) n += node.topics.reduce((s, x) => s + countQuestions(x), 0);
+  return n;
+}
 for (const f of bankFiles) {
   const id = f.replace(/\.json$/, "");
   const arr = JSON.parse(fs.readFileSync(path.join(BANKS, f), "utf8"));
-  let expect;
-  if (Array.isArray(arr)) expect = arr.length;
-  else if (arr && Array.isArray(arr.sub)) expect = [].concat.apply([], arr.sub.map(s => s.questions || [])).length;
-  else if (arr && Array.isArray(arr.questions)) expect = arr.questions.length;
-  else { console.log(`✗ ${id} bank 形态异常`); mism++; continue; }
+  let expect = countQuestions(arr);
+  if (expect === 0 && !(Array.isArray(arr) || (arr && (arr.questions || arr.sub || arr.stages)))) {
+    console.log(`✗ ${id} bank 形态异常`); mism++; continue;
+  }
   bankTotal += expect;
   const ex = loc[id];
   if (!ex) { console.log(`✗ catalog 中找不到考试 ${id}`); mism++; continue; }
