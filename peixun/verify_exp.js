@@ -5,8 +5,11 @@ const dom = new JSDOM(html, { runScripts: "outside-only", pretendToBeVisual: tru
 const w = dom.window; global.window = w; global.document = w.document; w.HTMLDocument = w.document;
 w.eval(fs.readFileSync("catalog.js", "utf8")); w.eval(fs.readFileSync("store.js", "utf8")); w.eval(fs.readFileSync("app.js", "utf8"));
 function go(h) { w.location.hash = h; w.dispatchEvent(new w.Event("hashchange")); }
-go("#/exam/lawfin/account");
-w.document.querySelector('[data-act="start-quiz"]').click();
+// account 现为多阶段考试，先进入首个阶段再点首个科目「开始刷题」
+go("#/exam/lawfin/account/st00");
+const sq = w.document.querySelector('[data-act="start-quiz"]');
+if (!sq) { console.log("✗ 未找到 start-quiz 按钮（account/st00）"); process.exit(1); }
+sq.click();
 let found = false, at = 0;
 for (let i = 0; i < 54 && !found; i++) {
   let confirm = w.document.querySelector('.acts [data-act="confirm"]');
