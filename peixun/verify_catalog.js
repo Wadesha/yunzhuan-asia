@@ -63,12 +63,15 @@ for (const id of banks) {
     const letters = optLetters(n.options);
     // 正确选支
     let correctSel;
-    if (n.type === "multi") correctSel = n.answer.map(L => letters.indexOf(L));
+    if (n.type === "bool") correctSel = n.options.indexOf(n.answer);       // 判断题 answer 是文字「正确/错误」
+    else if (n.type === "multi") correctSel = n.answer.map(L => letters.indexOf(L));
     else correctSel = letters.indexOf(n.answer);
     const okCor = grade(n, correctSel);
     // 错误选支：选一个不等于正确答案的组合
     let wrongSel;
-    if (n.type === "multi") {
+    if (n.type === "bool") {
+      wrongSel = n.options.findIndex(o => o !== n.answer);
+    } else if (n.type === "multi") {
       const alt = letters.find(L => !n.answer.includes(L));
       wrongSel = [letters.indexOf(alt)];
     } else {
