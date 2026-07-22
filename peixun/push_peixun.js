@@ -37,7 +37,7 @@ async function putFile(rel) {
   const abs = path.join(BASE, rel);
   const content = fs.readFileSync(abs).toString("base64");
   const sha = await getSha(rel);
-  const body = { message: "feat(peixun): 22个旧库用EXTRA加厚到120-140题——全48库客观题10004+阅读卡73; 旧库actuary140/architect132/audit128/broadcaster136/broker120/comm128/consult128/device120/eia128/institution128/journalist128/kechai128/metrologist120/nuclear120/patent128/publish128/realestate128/ship128/stat136/surveyor128/teacherrec128/urbanplanner128; 验证全绿(7012判分0失败/10004=10004/34UI); index.html ?v=20260722i 强刷", content, branch: BRANCH };
+  const body = { message: "feat(peixun): 新增16考试类型+14主流加厚——全64库客观题13576+阅读卡89; 新类型(军队文职/三支一扶/社区工作者/法院书记员/选调生/保代/法硕联考/公路水运检测/房地产经纪/中医执业/乡村全科/执业兽医/计算机等级/档案/证券投顾/期货分析)均四层drill-down; 14主流加厚至460-680题; 验证全绿(9880判分0失败/13576=13576/34UI); index.html ?v=20260722j 强刷", content, branch: BRANCH };
   if (sha) body.sha = sha;
   const r = await fetch(API + remotePath(rel), { method: "PUT", headers: HEADERS, body: JSON.stringify(body) });
   const txt = await r.text();
