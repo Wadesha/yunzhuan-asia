@@ -37,7 +37,7 @@ async function putFile(rel) {
   const abs = path.join(BASE, rel);
   const content = fs.readFileSync(abs).toString("base64");
   const sha = await getSha(rel);
-  const body = { message: "feat(peixun): 题库升级为四层树(考试→阶段→科目→知识点)+扩10小类——客观题2537+阅读卡73(共48库); 分阶段考试(法考/公务员/注会/一建/二建/会计)按阶段分科独立刷, 点科目只刷该题量(范围隔离); 判分后朗读仅读答案本身; 新增会计/执业药师/卫生资格/软考/银行/证券/基金/期货/社工/CATTI/导游/资产评估等小类; index.html ?v=20260722e 强刷", content, branch: BRANCH };
+  const body = { message: "feat(peixun): 10小时加厚P1+P2落地——26个四层库事实1797×4≈7188题(全48库客观题8341+阅读卡73); 14主流340-564题(法考564/一建428/注会440/公务员380/教资380/医师380/二建360/一造356/监理360/消防344/注安340/税务师344/经济师360/护士360); 12小类120-180题; 纯事实库派生; 验证全绿(5989判分0失败/8341=8341/34UI); index.html ?v=20260722g 强刷", content, branch: BRANCH };
   if (sha) body.sha = sha;
   const r = await fetch(API + remotePath(rel), { method: "PUT", headers: HEADERS, body: JSON.stringify(body) });
   const txt = await r.text();
