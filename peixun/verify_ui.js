@@ -1,4 +1,5 @@
-// 针对「分科刷题卡片 + 考试介绍/好处」新 UI 的真实验证（jsdom 真实渲染）
+// 针对「四层树（考试→阶段→科目→题目）」新 UI 的真实验证（jsdom 真实渲染）
+// 重点：① 阶段/科目分节点、逐层下钻、点科目即只刷该科目题；② 判分后朗读仅读答案本身（无前缀）
 const fs = require("fs");
 const path = require("path");
 const { JSDOM } = require("jsdom");
@@ -12,8 +13,18 @@ const cleaned = html.replace(/<script\s+src=[^>]*><\/script>/g, "");
 
 const dom = new JSDOM(cleaned, { runScripts: "outside-only", pretendToBeVisual: true, url: "https://yunzhuan.asia/peixun/" });
 const { window } = dom;
-window.HTMLDocument = window.document;
 global.window = window; global.document = window.document;
+window.HTMLDocument = window.document;
+
+// ---- 语音朗读 mock：捕获每次 speak 的文本，验证「只读答案本身」 ----
+let spoken = [];
+window.SpeechSynthesisUtterance = function (text) { this.text = text; };
+window.speechSynthesis = {
+  speak: function (u) { spoken.push(u.text); },
+  cancel: function () {},
+  getVoices: function () { return []; },
+};
+
 window.eval(catalog); window.eval(store); window.eval(app);
 
 let pass = 0, fail = 0;
@@ -23,90 +34,102 @@ function go(hash) {
   window.dispatchEvent(new window.Event("hashchange"));
 }
 function appHtml() { return window.document.getElementById("app").innerHTML; }
+function $(sel) { return window.document.querySelector(sel); }
+function $all(sel) { return Array.prototype.slice.call(window.document.querySelectorAll(sel)); }
+function gradeAll() {
+  for (let i = 0; i < 300; i++) {
+    if ($(".sum")) return true;
+    const opt = $(".q .opt");
+    if (opt && !$(".fb")) opt.click();
+    const nx = $('.acts [data-act="next"]');
+    if (nx) nx.click(); else break;
+  }
+  return !!$(".sum");
+}
 
-// 1) 公务员（有分科）
-go("#/exam/gov/civil");
+// 1) 法考（分两阶段：客观题 / 主观题）——顶层是阶段卡片，逐层下钻
+go("#/exam/lawfin/lawyer");
 let h = appHtml();
-ok("公务员页含「考试介绍」框", h.indexOf("考试介绍") >= 0);
-ok("公务员页含「通过的好处」框", h.indexOf("通过的好处") >= 0);
-ok("公务员页含「分科刷题」区", h.indexOf("分科刷题") >= 0);
-ok("公务员页渲染 2 个分科卡片", window.document.querySelectorAll(".subcard").length === 2);
-ok("公务员页含行测/公基考点分科", h.indexOf("行测") >= 0);
-ok("公务员页含申论/例题分科", h.indexOf("申论") >= 0);
+ok("法考顶层含「客观题」阶段", h.indexOf("客观题") >= 0);
+ok("法考顶层含「主观题」阶段", h.indexOf("主观题") >= 0);
+ok("分阶段考试顶层用「进入（N 题）」下钻（非整体打包）", h.indexOf("进入（") >= 0);
+// 进入客观题阶段 → 看到科目（刑法等）与「开始刷题」
+go("#/exam/lawfin/lawyer/st00");
+h = appHtml();
+ok("进入客观题阶段后含科目卡片（刑法）", h.indexOf("刑法") >= 0);
+ok("客观题阶段内含「开始刷题」按钮", $all('[data-act="start-quiz"]').length > 0);
 
-// 2) 教师资格（2 分科：客观题 / 案例）
+// 2) 公务员（分两阶段：行测 / 申论）
+go("#/exam/gov/civil");
+ok("公务员顶层含「行政职业能力测验」阶段", appHtml().indexOf("行政职业能力测验") >= 0);
+go("#/exam/gov/civil/st00");
+ok("进入行测阶段后含科目（行测-常识等）", appHtml().indexOf("行测-常识") >= 0);
+ok("行测阶段内含「开始刷题」按钮", $all('[data-act="start-quiz"]').length > 0);
+
+// 3) 教资（单阶段，直接分科目）
 go("#/exam/edu/teacher");
 h = appHtml();
-ok("教资页渲染 2 个分科卡片", window.document.querySelectorAll(".subcard").length === 2);
-ok("教资页含「客观题」分科", h.indexOf("客观题") >= 0);
-ok("教资页含「材料分析 / 例题」分科", h.indexOf("材料分析") >= 0);
+ok("教资页含科目卡片（教育学）", h.indexOf("教育学") >= 0);
+ok("教资页含「开始刷题」按钮", $all('[data-act="start-quiz"]').length > 0);
 
-// 3) 法考（已分科：客观题/主观题）
-go("#/exam/lawfin/lawyer");
-h = appHtml();
-ok("律师页渲染 2 个分科卡片", window.document.querySelectorAll(".subcard").length === 2);
-ok("律师页含「客观题」分科", h.indexOf("客观题") >= 0);
-ok("律师页含「主观题」分科", h.indexOf("主观题") >= 0);
-ok("律师页含考试介绍/好处", h.indexOf("考试介绍") >= 0 && h.indexOf("通过的好处") >= 0);
+// 4) 点进某科目即只刷该科目题（范围隔离）：取首个开始刷题按钮，记录声明题量，刷完核对
+go("#/exam/lawfin/lawyer/st00");
+const firstBtn = $('[data-act="start-quiz"]');
+const m = (firstBtn.textContent || "").match(/（(\d+)\s*题）/);
+const declared = m ? parseInt(m[1], 10) : -1;
+ok("开始刷题按钮显示该题量", declared > 0);
+firstBtn.click();
+const bar = $(".bar .meta");
+ok("进入科目刷题渲染题号（第 1 / N 题）", !!bar && /第 1 \/ \d+ 题/.test(bar.textContent));
+const totalFromBar = bar ? parseInt((bar.textContent.match(/第 1 \/ (\d+) 题/) || [])[1], 10) : -1;
+ok("题号总量与按钮声明一致", totalFromBar === declared);
+const reached = gradeAll();
+ok("刷完该科目到达总结页", reached);
+const sumText = $(".sum") ? $(".sum").textContent : "";
+const sumTotal = (sumText.match(/共\s*(\d+)\s*题/) || [])[1];
+ok("总结页题量=该科目题量（范围隔离）", sumTotal && parseInt(sumTotal, 10) === declared);
 
-// 4) 技能信息卡（焊工）也展示介绍/好处
+// 5) 判分后朗读仅读答案本身（无「正确答案」/「回答正确」/「回答错误」前缀）
+go("#/exam/lawfin/lawyer/st00");
+$('[data-act="start-quiz"]').click();
+const opt = $(".q .opt");
+ok("渲染首题选项", !!opt);
+spoken = [];
+opt.click(); // 单选自动判分 → 触发 readAnswer（仅读答案）
+const fb = $(".q .fb");
+ok("点击选项后渲染判分反馈 .fb", !!fb);
+ok("判分后展示解析/考点 .exp", !!$(".q .exp"));
+ok("判分后至少朗读了一次", spoken.length >= 1);
+const ansText = spoken[spoken.length - 1] || "";
+ok("朗读内容非空", ansText.length > 0);
+ok("朗读不含「正确答案」前缀", ansText.indexOf("正确答案") < 0);
+ok("朗读不含「回答正确」前缀", ansText.indexOf("回答正确") < 0);
+ok("朗读不含「回答错误」前缀", ansText.indexOf("回答错误") < 0);
+
+// 6) 阅读卡页（主观题例题+参考答案）：真实渲染与交互
+go("#/read/lawfin/lawyer");
+ok("阅读卡页渲染 .read-card", !!$(".read-card"));
+ok("阅读卡页含题干 .qt 文本", (function () { const t = $(".read-card .qt"); return !!t && t.textContent.length > 0; })());
+ok("阅读卡页有「显示参考答案」按钮", !!$('[data-act="show-ans"]'));
+ok("阅读卡页有「收藏」按钮", !!$('[data-act="fav-read"]'));
+let ansEl = $("[data-ans]");
+ok("参考答案初始隐藏", ansEl && ansEl.style.display === "none");
+$('[data-act="show-ans"]').click();
+ansEl = $("[data-ans]");
+ok("点击后参考答案可见且含 .ans-b 文本", !!ansEl && ansEl.style.display !== "none" && (function () { const b = ansEl.querySelector(".ans-b"); return !!b && b.textContent.length > 0; })());
+let favBtn = $('[data-act="fav-read"]');
+favBtn.click();
+favBtn = $('[data-act="fav-read"]');
+ok("点击收藏后按钮变「已收藏」", !!favBtn && favBtn.textContent.indexOf("已收藏") >= 0);
+let nextBtn = $('[data-act="next-read"]');
+ok("有「下一张」按钮", !!nextBtn);
+if (nextBtn) { nextBtn.click(); ok("下一张后进度更新（第 2 /）", appHtml().indexOf("第 2 /") >= 0); }
+
+// 7) 技能信息卡（焊工）仍展示介绍/好处
 go("#/exam/skill/welder");
 h = appHtml();
 ok("焊工信息卡页含考试介绍", h.indexOf("考试介绍") >= 0);
 ok("焊工信息卡页含实操说明", h.indexOf("实操考核") >= 0);
-
-// 5) 真实进入分科刷题并判一题（civil 客观题）
-go("#/exam/gov/civil");
-const xingceBtn = window.document.querySelector('.subcard [data-sub="obj"]');
-ok("找到客观题「开始刷题」按钮", !!xingceBtn);
-xingceBtn.click();
-const q = window.document.querySelector(".q .qt");
-ok("进入行测刷题渲染首题题干", !!q && q.textContent.length > 0);
-const firstOpt = window.document.querySelector(".q .opt");
-firstOpt.click(); // 单选自动判分
-const fb = window.document.querySelector(".q .fb");
-ok("点击选项后渲染判分反馈", !!fb);
-ok("首题判分后含正确答案文本", fb && fb.textContent.indexOf("正确答案") >= 0);
-
-// 6) 解析/考点字段（e）在判分后展示：进入含 e 题库，逐题判分直到出现 .exp
-go("#/exam/lawfin/account");
-const accStart = window.document.querySelector('[data-act="start-quiz"]');
-ok("会计页含「开始刷题」按钮", !!accStart);
-accStart.click();
-let expShown = false;
-for (let k = 0; k < 60 && !expShown; k++) {
-  const cfm = window.document.querySelector('.acts [data-act="confirm"]');
-  if (cfm) {
-    const o = window.document.querySelector(".q .opt"); if (o) o.click();
-    const c2 = window.document.querySelector('.acts [data-act="confirm"]'); if (c2) c2.click();
-  } else {
-    const o = window.document.querySelector(".q .opt"); if (!o) break; o.click();
-  }
-  if (window.document.querySelector(".q .exp")) { expShown = true; break; }
-  const nx = window.document.querySelector('.acts [data-act="next"]'); if (nx) nx.click(); else break;
-}
-ok("判分后展示「解析/考点」(.exp)", expShown);
-
-// 7) 阅读卡（主观题例题+参考答案）：真实渲染与交互
-go("#/read/lawfin/lawyer");
-h = appHtml();
-ok("阅读卡页渲染 .read-card", !!window.document.querySelector(".read-card"));
-ok("阅读卡页含题干 .qt 文本", (function () { var t = window.document.querySelector(".read-card .qt"); return !!t && t.textContent.length > 0; })());
-ok("阅读卡页有「显示参考答案」按钮", !!window.document.querySelector('[data-act="show-ans"]'));
-ok("阅读卡页有「收藏」按钮", !!window.document.querySelector('[data-act="fav-read"]'));
-let ansEl = window.document.querySelector("[data-ans]");
-ok("参考答案初始隐藏 (display:none)", ansEl && ansEl.style.display === "none");
-window.document.querySelector('[data-act="show-ans"]').click();
-ansEl = window.document.querySelector("[data-ans]");
-ok("点击后参考答案可见且含 .ans-b 文本", !!ansEl && ansEl.style.display !== "none" && (function () { var b = ansEl.querySelector(".ans-b"); return !!b && b.textContent.length > 0; })());
-let favBtn = window.document.querySelector('[data-act="fav-read"]');
-favBtn.click();
-favBtn = window.document.querySelector('[data-act="fav-read"]');
-ok("点击收藏后按钮变「已收藏」", !!favBtn && favBtn.textContent.indexOf("已收藏") >= 0);
-ok("收藏写入 localStorage (peixun_reads_fav_v1)", (window.localStorage.getItem("peixun_reads_fav_v1") || "").indexOf("lawfin/lawyer") >= 0);
-let nextBtn = window.document.querySelector('[data-act="next-read"]');
-ok("有「下一张」按钮", !!nextBtn);
-if (nextBtn) { nextBtn.click(); ok("下一张后进度更新 (第 2 张)", appHtml().indexOf("第 2 /") >= 0); }
 
 console.log("\nUI 验证：" + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);
