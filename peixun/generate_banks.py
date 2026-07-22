@@ -9,23 +9,21 @@ build_objective 把每条事实生成 正向("下列说法正确的是")+反向(
                    sub:[ {id:"obj",name,questions}, {id:"case",name,questions,reads} ] }
 经 build_catalog.js 汇总到 catalog.js（exam.questions / exam.sub / exam.reads）。
 事实均来自公开科目范围（非官方真题），仅供演示与自测。"""
-import json, random
+import json, random, re
 random.seed(20260722)
 
-# ---------- 通用引擎 ----------
+# ---------- 通用引擎（四层：考试→阶段→科目→题目） ----------
 def letterize(opts):
     """给选项加字母前缀 A/B/C/D…，返回 options 字符串。"""
     return " | ".join("%s %s" % (chr(65 + i), o) for i, o in enumerate(opts))
 
-def build_objective(facts):
-    """每条事实 → 正向+反向两道单选；返回 questions 列表（带 e 解析）。"""
+def build_questions(items, pool):
+    """每条事实 → 正向+反向两道单选；items=[(term, correct)]，干扰项取自同考试 pool。"""
     qs = []
-    pool = [f[2] for f in facts]
-    for subj, term, correct in facts:
+    for term, correct in items:
         others = [p for p in pool if p != correct]
         random.shuffle(others)
         ds = others[:3]
-        # 正向
         opts = [correct] + ds
         random.shuffle(opts)
         ans = chr(65 + opts.index(correct))
@@ -34,7 +32,6 @@ def build_objective(facts):
                    "options": letterize(opts),
                    "a": ans,
                    "e": "考点：%s —— %s" % (term, correct)})
-        # 反向（答案为某个错误表述）
         wrong = ds[0]
         opts2 = [correct] + [wrong] + ds[1:3]
         random.shuffle(opts2)
@@ -46,22 +43,69 @@ def build_objective(facts):
                    "e": "考点：%s —— 正确表述为：%s" % (term, correct)})
     return qs
 
-def make_bank(meta, facts, reads, case_n=40):
-    """组装 bank：obj 全量事实题 + case 子集题(附阅读卡)。"""
-    obj = build_objective(facts)
-    case_subset = facts[:min(case_n, len(facts))]
-    case_q = build_objective(case_subset)
-    return {
-        "intro": meta["intro"],
-        "benefit": meta["benefit"],
-        "levels": meta.get("levels", []),
-        "subjects": meta.get("subjects", []),
-        "sub": [
-            {"id": "obj", "name": meta.get("obj_name", "客观题（考点单选）"), "questions": obj},
-            {"id": "case", "name": meta.get("case_name", "案例 / 例题 · 参考答案（不计分）"),
-             "questions": case_q, "reads": reads}
-        ]
-    }
+def parse_subject(q):
+    """从阅读卡题干里取【科目】前缀（取·之前部分）作为科目名。"""
+    m = re.search(r"【([^】]+)】", q or "")
+    if not m:
+        return "综合"
+    return m.group(1).split("·")[0].strip()
+
+def build_bank_from(meta, facts, reads, stages_list, subject_stage, read_stage=None):
+    """把 (subject,term,correct) 事实库按其科目归集到阶段/科目，生成 stages/sub 树。
+    - stages_list: 阶段名有序列表（facts 默认落入 stages_list[0]）
+    - subject_stage: {科目: 阶段}，决定某科目归入哪个阶段
+    - read_stage: 若设置，所有阅读卡归入该阶段；否则按【科目】推导
+    """
+    spec = {}
+    for st in stages_list:
+        spec.setdefault(st, {})
+    pool = [f[2] for f in facts]
+    for (subj, term, correct) in facts:
+        st = subject_stage.get(subj, stages_list[0])
+        spec.setdefault(st, {}).setdefault(subj, []).append((term, correct))
+    nodes = {}
+    for st in spec:
+        for subj, items in spec[st].items():
+            nodes.setdefault(st, {})[subj] = {"q": build_questions(items, pool), "r": []}
+    fact_stage_of = dict(subject_stage)
+    for r in reads:
+        subj = parse_subject(r.get("q", ""))
+        if read_stage:
+            st = read_stage
+        else:
+            st = fact_stage_of.get(subj, stages_list[0])
+        nodes.setdefault(st, {}).setdefault(subj, {"q": [], "r": []})["r"].append(r)
+    return emit_bank(meta, nodes)
+
+def emit_bank(meta, nodes):
+    """nodes: {阶段:{科目:{q,r}}}。多阶段→stages；单阶段→sub。"""
+    use_stages = len(nodes) > 1
+    out = {}
+    if meta.get("intro"):
+        out["intro"] = meta["intro"]
+    if meta.get("benefit"):
+        out["benefit"] = meta["benefit"]
+    if meta.get("levels"):
+        out["levels"] = meta["levels"]
+    if meta.get("subjects"):
+        out["subjects"] = meta["subjects"]
+    counter = [0]
+    def mksub(subj, node):
+        s = {"id": "s%02d" % counter[0], "name": subj, "questions": node["q"]}
+        counter[0] += 1
+        if node["r"]:
+            s["reads"] = node["r"]
+        return s
+    if use_stages:
+        sts = []
+        for si, (st, subs) in enumerate(nodes.items()):
+            ss = [mksub(subj, node) for subj, node in subs.items()]
+            sts.append({"id": "st%02d" % si, "name": st, "subs": ss})
+        out["stages"] = sts
+    else:
+        only = list(nodes.values())[0]
+        out["sub"] = [mksub(subj, node) for subj, node in only.items()]
+    return out
 
 # ---------- 法考 (lawfin / lawyer) ----------
 LAWYER_FACTS = [
@@ -1008,36 +1052,325 @@ ECONOMY_META = {
  "case_name":"案例 / 例题 · 参考答案（不计分）",
 }
 
-# ---------- 注册表 ----------
-REGISTRY = {
- "lawyer": (LAWYER_META, LAWYER_FACTS, LAWYER_READS),
- "constructor": (CONSTRUCTOR_META, CONSTRUCTOR_FACTS, CONSTRUCTOR_READS),
- "constructor2": (CONSTRUCTOR2_META, CONSTRUCTOR2_FACTS, CONSTRUCTOR2_READS),
- "cpa": (CPA_META, CPA_FACTS, CPA_READS),
- "civil": (CIVIL_META, CIVIL_FACTS, CIVIL_READS),
- "teacher": (TEACHER_META, TEACHER_FACTS, TEACHER_READS),
- "nurse": (NURSE_META, NURSE_FACTS, NURSE_READS),
- "doctor": (DOCTOR_META, DOCTOR_FACTS, DOCTOR_READS),
- "costeng": (COSTENG_META, COSTENG_FACTS, COSTENG_READS),
- "supervisor": (SUPERVISOR_META, SUPERVISOR_FACTS, SUPERVISOR_READS),
- "fireeng": (FIREENG_META, FIREENG_FACTS, FIREENG_READS),
- "safetyeng": (SAFETYENG_META, SAFETYENG_FACTS, SAFETYENG_READS),
- "taxagent": (TAXAGENT_META, TAXAGENT_FACTS, TAXAGENT_READS),
- "economy": (ECONOMY_META, ECONOMY_FACTS, ECONOMY_READS),
+# ========== 10 类小类事实库（按科目分组，接入四层树） ==========
+ACCOUNT_META = {}
+ACCOUNT_FACTS = [
+ ("初级会计实务","资产定义","资产是企业过去交易形成、由企业拥有或控制的、预期会给企业带来经济利益的资源"),
+ ("初级会计实务","坏账准备","应收账款按预期信用损失计提坏账准备，实际发生坏账时冲减坏账准备"),
+ ("初级会计实务","权责发生制","我国企业会计核算以权责发生制为基础，按权利义务归属期确认收入费用"),
+ ("初级会计实务","存货计价","存货发出计价可采用先进先出法、移动加权平均法、个别计价法等"),
+ ("初级会计实务","固定资产折旧","固定资产折旧方法含年限平均法、工作量法、双倍余额递减、年数总和法"),
+ ("经济法基础","增值税","一般纳税人销售货物基本税率13%，交通运输建筑不动产9%，现代服务6%"),
+ ("经济法基础","个人所得税","综合所得（工资薪金、劳务报酬、稿酬、特许权使用费）按3%-45%超额累进"),
+ ("经济法基础","劳动合同","劳动者提前30日书面通知用人单位可解除固定期限劳动合同"),
+ ("经济法基础","票据","支票、本票、汇票为《票据法》规定的三种票据"),
+ ("中级会计实务","长期股权投资","对被投资单位实施控制（>50%）形成成本法核算的长期股权投资"),
+ ("中级会计实务","收入确认","收入确认五步：识别合同、识别履约义务、确定价格、分摊、履行义务时确认"),
+ ("中级会计实务","合并报表","母公司编制合并报表应抵销内部交易未实现损益"),
+ ("财务管理","资本成本","加权平均资本成本 WACC 是投资决策与估值的重要折现率"),
+ ("财务管理","净现值","独立投资项目以 NPV≥0 或 IRR≥基准收益率为可行"),
+ ("经济法","公司","有限责任公司由50个以下股东出资设立，资本认缴"),
+ ("经济法","有限合伙","有限合伙企业中有限合伙人不执行合伙事务，以其认缴出资为限担责"),
+]
+ACCOUNT_READS = [
+ {"q":"【初级会计实务·计算】甲公司年初应收账款100万，年末按预期信用损失计提坏账准备8万，实际发生坏账5万。年末应收账款账面价值多少？",
+  "a":"计提坏账准备使应收账款账面价值减少8万（至92万）；实际发生坏账5万时借坏账准备、贷应收账款，应收账款与坏账准备同减5万，账面价值再减5万至87万。账面价值=账面余额-坏账准备，核销不影响最终净额。",
+  "e":"考点：应收账款账面价值=余额-坏账准备；核销同时减余额与准备，净额不变。"},
+ {"q":"【中级会计实务·分析】甲公司持乙公司30%股权，派出董事参与经营决策，并能施加重大影响。该项投资应如何核算？",
+  "a":"持股20%-50%且能施加重大影响，属长期股权投资权益法核算范围。权益法下初始按成本入账，后续按应享有被投资方净资产份额变动调整长期股权投资与投资收益，不确认商誉。",
+  "e":"考点：重大影响（20%-50%）→权益法；控制（>50%）→成本法。"},
+]
+
+PHARM_META = {}
+PHARM_FACTS = [
+ ("药事管理与法规","处方药","处方药须凭执业医师或执业助理医师处方方可调配、购买和使用"),
+ ("药事管理与法规","非处方药","非处方药（OTC）不需处方，按药品标签说明书自行购买使用"),
+ ("药事管理与法规","GMP","药品生产质量管理规范（GMP）是药品生产质量管理的基本准则"),
+ ("药事管理与法规","处方限量","处方一般不得超过7日用量；急诊处方不得超过3日用量"),
+ ("药事管理与法规","不良反应","新药监测期内药品应报告所有不良反应；其他药品报告新的、严重的"),
+ ("药学专业知识一","生物利用度","生物利用度指药物吸收进入体循环的相对量与速度"),
+ ("药学专业知识一","半衰期","药物半衰期（t1/2）是血药浓度下降一半所需时间，决定给药间隔"),
+ ("药学专业知识一","首过效应","药物口服经门静脉入肝被代谢，使进入体循环药量减少称首过效应"),
+ ("药学专业知识二","抗生素","β-内酰胺类抗生素（青霉素、头孢）通过抑制细菌细胞壁合成杀菌"),
+ ("药学专业知识二","解热镇痛","解热镇痛抗炎药（NSAIDs）通过抑制前列腺素合成发挥解热镇痛抗炎"),
+ ("药学综合知识与技能","配伍禁忌","两药配伍产生沉淀、变色或效价降低为配伍禁忌，应避免同瓶输注"),
+ ("药学综合知识与技能","治疗药物监测","治疗窗窄的药物（如地高辛、苯妥英）须进行治疗药物浓度监测"),
+ ("药学综合知识与技能","相互作用","红霉素与茶碱合用可抑制其代谢，使茶碱血药浓度升高致中毒"),
+]
+PHARM_READS = [
+ {"q":"【药事管理与法规·案例】某零售药店执业药师不在岗，店员擅自将处方药阿奇霉素售予顾客。是否合规？",
+  "a":"不合规。处方药须凭医师处方销售，且执业药师应在岗审核调配。处方药销售是药师法定职责，非药师不得代为售卖；药店应挂牌\"执业药师不在岗，暂停销售处方药\"。违者可被药监部门处罚。",
+  "e":"考点：处方药凭处方+执业药师在岗；不在岗须停售处方药。"},
+ {"q":"【药学综合·简答】简述地高辛需要进行治疗药物监测（TDM）的原因。",
+  "a":"地高辛治疗窗窄、个体差异大、毒性反应严重（心律失常）。其有效血药浓度为0.8-2.0ng/ml，稍超即中毒。通过TDM可个体化调整剂量，在疗效与毒性间取得平衡，尤其用于心衰伴肾功能不全者。",
+  "e":"考点：窄治疗窗+个体差异→TDM；地高辛安全范围小。"},
+]
+
+HEALTH_META = {}
+HEALTH_FACTS = [
+ ("基础知识","基本组织","人体四大基本组织为上皮、结缔、肌、神经组织"),
+ ("基础知识","内环境","细胞外液构成机体内环境，稳态是内环境理化性质相对稳定的状态"),
+ ("基础知识","血型","ABO 血型系统含 A、B、AB、O 四型，输血以同型为首选"),
+ ("相关专业知识","医院感染","医院感染指住院期间获得的感染，入院48小时后肺炎多属院感"),
+ ("相关专业知识","消毒灭菌","灭菌指杀灭全部微生物（含芽孢）；消毒仅杀灭病原微生物"),
+ ("专业知识","心肺复苏","成人心肺复苏按压深度5-6cm、频率100-120次/分，按压通气比30:2"),
+ ("专业知识","休克","休克本质是有效循环血量锐减、组织灌注不足"),
+ ("专业知识","脱水","等渗性脱水丢失水钠等比，常见于呕吐、肠瘘、大面积创面渗出"),
+ ("专业实践能力","护理程序","护理程序五步骤：评估、诊断、计划、实施、评价"),
+ ("专业实践能力","无菌","无菌物品应存放清洁干燥处，无菌包受潮或过期不得使用"),
+]
+HEALTH_READS = [
+ {"q":"【专业知识·案例】患者男65岁，呕血黑便、面色苍白、心率120次/分、血压85/55mmHg。首要处理？",
+  "a":"考虑上消化道大出血致失血性休克。首要：① 卧床、吸氧、监护生命体征；② 建立两条静脉通路快速补液输血；③ 抑酸（PPI静脉泵入）、必要时内镜下止血；④ 查血常规血型交叉配血。边复苏边查因，禁用单纯升压药掩盖灌注不足。",
+  "e":"考点：失血性休克=快速补液输血+止血；先复苏后查因。"},
+ {"q":"【专业实践能力·简答】无菌技术操作中，取用无菌物品应遵循哪些原则？",
+  "a":"① 操作前洗手戴口罩，环境清洁宽敞；② 无菌物品须存放清洁干燥、在有效期内；③ 取物用无菌钳，不可跨越无菌区；④ 一份无菌物品仅供一位患者；⑤ 疑污染或已污染即不得使用。核心是避免微生物侵入与交叉污染。",
+  "e":"考点：无菌操作五原则——环境/有效期/无菌钳/一人一份/疑污不用。"},
+]
+
+SOFT_META = {}
+SOFT_FACTS = [
+ ("基础知识","生命周期","软件生命周期含需求、设计、编码、测试、维护阶段"),
+ ("基础知识","需求分析","需求分析阶段主要交付物是软件需求规格说明书"),
+ ("基础知识","OSI","TCP 位于 OSI 传输层；IP 位于网络层"),
+ ("基础知识","数据结构","栈是后进先出（LIFO）的线性结构；队列是先进先出（FIFO）"),
+ ("基础知识","数据库","关系数据库三级模式：外模式、模式、内模式"),
+ ("基础知识","算法","时间复杂度描述算法执行时间随问题规模增长的趋势"),
+ ("应用技术","设计模式","单例模式保证一个类仅有一个实例并提供全局访问点"),
+ ("应用技术","软件测试","黑盒测试关注功能不关心内部实现；白盒测试关注内部逻辑"),
+ ("应用技术","UML","用例图描述系统功能与参与者交互；类图描述静态结构"),
+ ("应用技术","项目管理","关键路径决定项目最短总工期，关键活动总时差为0"),
+]
+SOFT_READS = [
+ {"q":"【应用技术·案例】某项目有A(3天)→B(4天)、A→C(5天)、B→D(2天)、C→D(2天)（天）。关键路径与总工期？",
+  "a":"路径A-B-D=3+4+2=9天；路径A-C-D=3+5+2=10天。关键路径为A-C-D，总工期10天。D的总时差=10-9=1天（B-D路径有1天浮动）。关键活动A、C、D总时差为0。",
+  "e":"考点：关键路径=最长路径；总工期=关键路径长度。"},
+ {"q":"【基础知识·简答】面向对象三大特征及其含义。",
+  "a":"封装（隐藏内部实现、仅暴露接口）、继承（子类复用父类属性方法、扩展功能）、多态（同一接口不同实现，运行时动态绑定）。三者共同提升可维护性与可扩展性。",
+  "e":"考点：封装/继承/多态——OO 三大基石。"},
+]
+
+BANK_META = {}
+BANK_FACTS = [
+ ("法律法规与综合能力","中央银行","中央银行在金融体系中居主导地位，负责制定执行货币政策"),
+ ("法律法规与综合能力","商业银行职能","商业银行最基本职能是信用中介"),
+ ("法律法规与综合能力","反洗钱","客户身份资料与交易记录应至少保存5年"),
+ ("法律法规与综合能力","巴塞尔","巴塞尔协议Ⅲ商业银行核心一级资本充足率最低4.5%"),
+ ("法律法规与综合能力","存款保险","存款保险最高偿付限额为人民币50万元"),
+ ("个人理财","理财定义","个人理财是客户根据生命周期规划实现财务目标的过程"),
+ ("个人理财","风险偏好","客户风险偏好分保守、稳健、进取等类型，决定资产配置"),
+ ("公司信贷","信贷原则","商业银行信贷经营三原则：安全性、流动性、效益性"),
+ ("公司信贷","审贷分离","贷款实行审贷分离、分级审批，防控信用风险"),
+ ("风险管理","信用风险","信用风险是借款人违约导致损失的风险，是银行最主要风险"),
+ ("风险管理","资本充足","资本充足率反映银行以资本抵御风险的能力"),
+ ("银行管理","流动性","流动性比例不得低于25%，衡量短期偿债能力"),
+]
+BANK_READS = [
+ {"q":"【法律法规与综合能力·案例】客户怀疑某账户涉洗钱，银行应履行哪些义务？",
+  "a":"银行应：① 身份识别（KYC）与身份资料保存（≥5年）；② 大额与可疑交易向中国反洗钱监测分析中心报告；③ 对可疑账户采取相关控制措施；④ 保密举报人、配合调查。未履行致洗钱后果的，机构与责任人担责。",
+  "e":"考点：反洗钱=身份识别+可疑交易报告+配合；资料保存≥5年。"},
+ {"q":"【风险管理·简答】简述商业银行资本充足率监管的意义。",
+  "a":"资本充足率=资本/风险加权资产，是吸收意外损失、保护存款人利益的缓冲垫。巴塞尔Ⅲ要求核心一级≥4.5%、一级≥6%、资本充足率≥8%，并设储备资本与逆周期资本。充足资本可增强银行抗风险与持续经营能力。",
+  "e":"考点：资本充足率=资本/风险加权资产；巴塞尔Ⅲ最低线。"},
+]
+
+SEC_META = {}
+SEC_FACTS = [
+ ("金融市场基础","直接融资","股票、债券发行属于直接融资，资金供需双方直接交易"),
+ ("金融市场基础","货币政策","中央银行下调存款准备金率属扩张性货币政策"),
+ ("法律法规","公开发行","向不特定对象发行证券累计超200人为公开发行，须注册/核准"),
+ ("法律法规","内幕交易","内幕信息知情人利用未公开信息交易属内幕交易，违法"),
+ ("证券市场","注册制","我国股票发行实行注册制，以信息披露为核心"),
+ ("证券市场","投资者适当性","经营机构应了解客户、了解产品，将适当产品卖给适当投资者"),
+ ("证券市场","自律组织","证券交易所、证券业协会是证券业自律性组织"),
+]
+SEC_READS = [
+ {"q":"【证券市场·案例】某分析师在研报发布前买入相关股票获利。是否违法违规？",
+  "a":"违法违规。其利用未公开的研究报告信息交易，属内幕交易或抢先交易（利用未公开重大信息牟利），违反《证券法》关于禁止内幕交易、从业人员买卖股票限制等规定，证监会可没收违法所得并处罚款，情节严重追究刑责。",
+  "e":"考点：未公开信息交易=内幕/抢先交易；从业人员受买卖限制。"},
+]
+
+FUND_META = {}
+FUND_FACTS = [
+ ("法律法规","基金法","公开募集基金须经国务院证券监督管理机构注册"),
+ ("法律法规","托管","基金财产独立于管理人、托管人自有财产，由托管人托管"),
+ ("证券投资基金基础","净值","基金份额净值=基金资产净值/基金份额总额"),
+ ("证券投资基金基础","开放式","开放式基金规模不固定，按净值申购赎回"),
+ ("证券投资基金基础","投资限制","基金财产不得用于承销证券、向他人贷款或提供担保"),
+ ("私募股权","备案","私募基金募集完毕应在中国证券投资基金业协会备案"),
+ ("私募股权","合格投资者","私募合格投资者单只私募最低认购不低于100万元"),
+]
+FUND_READS = [
+ {"q":"【证券投资基金基础·计算】某开放式基金资产净值2亿元、负债2000万、份额1.8亿份。份额净值？",
+  "a":"份额净值=(资产净值-负债)/份额=(20000-2000)/18000≈1.0元/份。即每份约1.00元。基金资产独立于管理人财产，由托管人保管，按净值申购赎回。",
+  "e":"考点：份额净值=(总资产-总负债)/总份额。"},
+]
+
+FUT_META = {}
+FUT_FACTS = [
+ ("期货基础","套期保值","套期保值利用期货与现货价格趋同性对冲价格风险"),
+ ("期货基础","保证金","期货交易实行保证金制度，以小博大，有杠杆风险"),
+ ("期货基础","多头套保","担心未来买入涨价做多头套保；基差走弱盈亏相抵净盈利"),
+ ("法律法规","监管","中国证监会及其派出机构对期货市场实行集中统一监管"),
+ ("衍生品","远期","远期是场外非标准化合约；期货是交易所标准化合约"),
+]
+FUT_READS = [
+ {"q":"【期货基础·案例】榨油厂3个月后需买入大豆，担心涨价，应如何套保？",
+  "a":"应做多头套期保值：在期货市场买入3个月大豆合约。若现货涨价，期货盈利弥补现货采购成本上升；若现货跌，期货亏损被现货低价抵消，锁定成本。基差（现货-期货）走强时净盈利、走弱时净亏损，但价格风险已被对冲。",
+  "e":"考点：未来买入怕涨→多头套保；对冲价格风险。"},
+]
+
+SOC_META = {}
+SOC_FACTS = [
+ ("综合能力","价值观","社会工作核心价值观是助人自助、尊重接纳、个别化"),
+ ("综合能力","个案","个案工作以一对一方式为个人和家庭提供专业服务"),
+ ("综合能力","小组","小组工作通过团体互动促进成员改变与成长"),
+ ("综合能力","社区","社区工作以社区为对象推动居民参与解决共同问题"),
+ ("实务","接案","接案是社工与服务对象建立专业关系的第一步"),
+ ("实务","预估","预估是收集资料分析问题成因与需求的过程"),
+ ("法规与政策","低保","最低生活保障按家庭人均收入低于当地标准差额发放"),
+ ("法规与政策","老年人权益","老年人享有赡养、扶养、社会保障、参与社会等权益"),
+]
+SOC_READS = [
+ {"q":"【实务·案例】社工入户发现独居老人跌倒无人知晓，家中环境湿滑、夜间无照明。应如何介入？",
+  "a":"① 紧急：送医/联系家属，确保人身安全；② 资源链接：申请适老化改造（防滑、夜灯、扶手）、安装呼叫器；③ 正式+非正式支持：对接社区日间照料、邻居互助、定期探访；④ 政策：评估是否符合低保/特困/高龄补贴。强调案主自决与尊严，避免替代决策。",
+  "e":"考点：老年个案=安全+适老化+支持网络+政策；案主自决。"},
+]
+
+CAT_META = {}
+CAT_FACTS = [
+ ("笔译综合能力","翻译标准","近代翻译标准\"信、达、雅\"由严复提出"),
+ ("笔译综合能力","词义","语境决定词语具体含义，翻译须结合上下文选义"),
+ ("笔译综合能力","语体","翻译应区分书面语体与口语体，保持原文风格"),
+ ("笔译实务","增词","为符合译入语表达习惯，翻译可适当增词但不改原意"),
+ ("笔译实务","长句","处理英语长句常先理清主干再分层展开"),
+ ("口译","交替传译","交替传译在源语停顿后译出，常用于会议演讲"),
+ ("口译","笔记","口译笔记用符号关键词辅助记忆，不全文记录"),
+]
+CAT_READS = [
+ {"q":"【笔译实务·简答】直译与意译应如何取舍？",
+  "a":"无绝对优劣，应依文本与目的而定：科技、法律文本求准确宜偏直译；文学、广告求流畅宜偏意译。原则是\"信\"为先（不歪曲原意），在保证忠实前提下求达雅。多用直译保真、辅以意译通顺，避免死译与胡译。",
+  "e":"考点：信为先；科技法律偏直译、文学偏意译。"},
+]
+
+GUIDE_META = {}
+GUIDE_FACTS = [
+ ("政策与法律法规","旅游合同","旅行社与游客订立包价旅游合同应载明行程、服务标准等"),
+ ("政策与法律法规","安全事件","旅游突发事件按伤亡分特别重大、重大、较大、一般四级"),
+ ("导游业务","导游职责","导游人员应承担导游讲解、安排食宿、安全提示等职责"),
+ ("导游业务","证件","导游资格证书有效期3年，期满须换发"),
+ ("导游业务","计分","欺骗胁迫旅游者消费一次计扣10分"),
+ ("全国导游基础","佛教名山","中国佛教四大名山：五台山、普陀山、峨眉山、九华山"),
+ ("全国导游基础","世界遗产","中国世界遗产数量居世界前列，含故宫、长城等"),
+ ("地方导游基础","省情","各省级行政区有独特自然与人文旅游资源，导游须熟悉本地"),
+]
+GUIDE_READS = [
+ {"q":"【导游业务·案例】行程中突遇暴雨塌方道路中断，部分游客要求立即返程、部分要求等待。导游如何处理？",
+  "a":"① 安全第一，服从交管与旅行社安排，不冒险前行；② 及时安抚、说明情况，统一信息避免恐慌；③ 与旅行社协商调整行程或延期，就费用变更依合同协商；④ 保障食宿与通讯，必要时启动保险。导游不得擅自离团或强行通过危险路段。",
+  "e":"考点：突发事件=安全优先+统一信息+协商变更+不涉险。"},
+]
+
+APP_META = {}
+APP_FACTS = [
+ ("基础","三方法","资产评估三大基本方法：收益法、市场法、成本法"),
+ ("基础","原则","评估应遵循独立客观公正、合法、最高最佳利用原则"),
+ ("基础","价值类型","价值类型含市场价值、投资价值、清算价值等"),
+ ("相关知识","财务","评估需运用会计报表分析企业盈利与偿债能力"),
+ ("相关知识","经济法","评估涉及《公司法》《证券法》等关于资产交易的规定"),
+ ("实务一","机器设备","机器设备评估常用成本法，考虑实体性无形性经济性贬值"),
+ ("实务一","不动产","不动产评估常用市场法与收益法，关注区位因素"),
+ ("实务二","企业价值","企业价值评估常用收益法（现金流折现）与市场法"),
+]
+APP_READS = [
+ {"q":"【实务二·案例】评估一家稳定盈利制造企业股东全部权益，宜用何种方法？",
+  "a":"宜以收益法为主：预测未来自由现金流并按加权平均资本成本（WACC）折现得到企业价值；辅以市场法（可比交易/上市公司乘数）交叉验证。收益法能体现企业持续获利能力，最贴合股东全部权益内涵；成本法多用于重资产或破产清算。",
+  "e":"考点：持续经营→收益法（DCF）；市场法验证；成本法偏清算。"},
+]
+
+# ========== 统一配置：把每个考试的事实库映射到四层树 ==========
+CONFIG = {
+  # —— 14 个主流考试（事实库重排为 阶段→科目→题目） ——
+  "lawyer": dict(meta=LAWYER_META, facts=LAWYER_FACTS, reads=LAWYER_READS,
+     stages_list=["客观题（卷一/卷二）", "主观题（案例分析）"], subject_stage={}, read_stage="主观题（案例分析）"),
+  "cpa": dict(meta=CPA_META, facts=CPA_FACTS, reads=CPA_READS,
+     stages_list=["专业阶段（六科）", "综合阶段（职业能力综合测试）"], subject_stage={}, read_stage="综合阶段（职业能力综合测试）"),
+  "civil": dict(meta=CIVIL_META, facts=CIVIL_FACTS, reads=CIVIL_READS,
+     stages_list=["行政职业能力测验", "申论（主观写作）"],
+     subject_stage={"行测-常识":"行政职业能力测验","行测-言语":"行政职业能力测验","行测-数量":"行政职业能力测验","行测-判断":"行政职业能力测验","行测-资料":"行政职业能力测验","公基-政治":"行政职业能力测验","公基-经济":"行政职业能力测验","公基-法律":"行政职业能力测验","公基-管理":"行政职业能力测验","申论-概括":"申论（主观写作）","申论-对策":"申论（主观写作）","申论-公文":"申论（主观写作）","申论-作文":"申论（主观写作）"},
+     read_stage="申论（主观写作）"),
+  "constructor": dict(meta=CONSTRUCTOR_META, facts=CONSTRUCTOR_FACTS, reads=CONSTRUCTOR_READS,
+     stages_list=["公共课（经济·法规·管理）", "专业工程管理与实务"],
+     subject_stage={"经济":"公共课（经济·法规·管理）","法规":"公共课（经济·法规·管理）","管理":"公共课（经济·法规·管理）","实务-建筑":"专业工程管理与实务","实务-市政":"专业工程管理与实务","实务-机电":"专业工程管理与实务"},
+     read_stage="专业工程管理与实务"),
+  "constructor2": dict(meta=CONSTRUCTOR2_META, facts=CONSTRUCTOR2_FACTS, reads=CONSTRUCTOR2_READS,
+     stages_list=["公共课（管理·法规·经济）", "专业工程管理与实务"],
+     subject_stage={"管理":"公共课（管理·法规·经济）","法规":"公共课（管理·法规·经济）","经济":"公共课（管理·法规·经济）","实务":"专业工程管理与实务"},
+     read_stage=None),
+  "teacher": dict(meta=TEACHER_META, facts=TEACHER_FACTS, reads=TEACHER_READS,
+     stages_list=["综合素质与教育知识能力"], subject_stage={}, read_stage=None),
+  "nurse": dict(meta=NURSE_META, facts=NURSE_FACTS, reads=NURSE_READS,
+     stages_list=["专业实务与实践能力"], subject_stage={}, read_stage=None),
+  "doctor": dict(meta=DOCTOR_META, facts=DOCTOR_FACTS, reads=DOCTOR_READS,
+     stages_list=["医学综合与实践技能"], subject_stage={}, read_stage=None),
+  "costeng": dict(meta=COSTENG_META, facts=COSTENG_FACTS, reads=COSTENG_READS,
+     stages_list=["造价管理与计价"], subject_stage={}, read_stage=None),
+  "supervisor": dict(meta=SUPERVISOR_META, facts=SUPERVISOR_FACTS, reads=SUPERVISOR_READS,
+     stages_list=["监理三控两管一协调"], subject_stage={}, read_stage=None),
+  "fireeng": dict(meta=FIREENG_META, facts=FIREENG_FACTS, reads=FIREENG_READS,
+     stages_list=["消防技术实务与综合"], subject_stage={}, read_stage=None),
+  "safetyeng": dict(meta=SAFETYENG_META, facts=SAFETYENG_FACTS, reads=SAFETYENG_READS,
+     stages_list=["安全法规·管理·技术"], subject_stage={}, read_stage=None),
+  "taxagent": dict(meta=TAXAGENT_META, facts=TAXAGENT_FACTS, reads=TAXAGENT_READS,
+     stages_list=["税法与涉税服务"], subject_stage={}, read_stage=None),
+  "economy": dict(meta=ECONOMY_META, facts=ECONOMY_FACTS, reads=ECONOMY_READS,
+     stages_list=["经济基础知识与实务"], subject_stage={}, read_stage=None),
+  # —— 10 类小类（扩科，按科目独立成节点） ——
+  "account": dict(meta=ACCOUNT_META, facts=ACCOUNT_FACTS, reads=ACCOUNT_READS,
+     stages_list=["初级", "中级"],
+     subject_stage={"初级会计实务":"初级","经济法基础":"初级","中级会计实务":"中级","财务管理":"中级","经济法":"中级"}, read_stage=None),
+  "pharmacist": dict(meta=PHARM_META, facts=PHARM_FACTS, reads=PHARM_READS,
+     stages_list=["药学类（四科）"], subject_stage={}, read_stage=None),
+  "healthtech": dict(meta=HEALTH_META, facts=HEALTH_FACTS, reads=HEALTH_READS,
+     stages_list=["医/药/护/技（初中级）"], subject_stage={}, read_stage=None),
+  "software": dict(meta=SOFT_META, facts=SOFT_FACTS, reads=SOFT_READS,
+     stages_list=["初/中/高级"], subject_stage={}, read_stage=None),
+  "banker": dict(meta=BANK_META, facts=BANK_FACTS, reads=BANK_READS,
+     stages_list=["初/中级"], subject_stage={}, read_stage=None),
+  "securities": dict(meta=SEC_META, facts=SEC_FACTS, reads=SEC_READS,
+     stages_list=["入门"], subject_stage={}, read_stage=None),
+  "fund": dict(meta=FUND_META, facts=FUND_FACTS, reads=FUND_READS,
+     stages_list=["入门"], subject_stage={}, read_stage=None),
+  "futures": dict(meta=FUT_META, facts=FUT_FACTS, reads=FUT_READS,
+     stages_list=["入门"], subject_stage={}, read_stage=None),
+  "socialwork": dict(meta=SOC_META, facts=SOC_FACTS, reads=SOC_READS,
+     stages_list=["初/中/高级"], subject_stage={}, read_stage=None),
+  "catti": dict(meta=CAT_META, facts=CAT_FACTS, reads=CAT_READS,
+     stages_list=["一/二/三级"], subject_stage={}, read_stage=None),
+  "guide": dict(meta=GUIDE_META, facts=GUIDE_FACTS, reads=GUIDE_READS,
+     stages_list=["笔试+面试"], subject_stage={}, read_stage=None),
+  "appraiser": dict(meta=APP_META, facts=APP_FACTS, reads=APP_READS,
+     stages_list=["全科（四科）"], subject_stage={}, read_stage=None),
 }
 
 def main():
-    total_q = 0; total_reads = 0
-    for exam_id, (meta, facts, reads) in REGISTRY.items():
-        bank = make_bank(meta, facts, reads)
+    total_q = 0; total_reads = 0; multi = 0
+    for exam_id, cfg in CONFIG.items():
+        bank = build_bank_from(cfg["meta"], cfg["facts"], cfg["reads"],
+                               cfg["stages_list"], cfg["subject_stage"], cfg.get("read_stage"))
         with open("banks/%s.json" % exam_id, "w", encoding="utf-8") as f:
             json.dump(bank, f, ensure_ascii=False, indent=1)
-        obj_n = len(bank["sub"][0]["questions"])
-        case_n = len(bank["sub"][1]["questions"])
-        print("  + %s: 客观题 %d（obj %d + case %d），阅读卡 %d"
-              % (exam_id, obj_n + case_n, obj_n, case_n, len(reads)))
-        total_q += obj_n + case_n; total_reads += len(reads)
-    print("\nDone. 生成 %d 个考试 bank；合计 %d 客观题 + %d 阅读卡" % (len(REGISTRY), total_q, total_reads))
+        nq = sum(len(x.get("questions", [])) for st in bank.get("stages", []) for x in st["subs"])
+        nq += sum(len(x.get("questions", [])) for x in bank.get("sub", []))
+        nr = sum(len(x.get("reads", [])) for st in bank.get("stages", []) for x in st["subs"])
+        nr += sum(len(x.get("reads", [])) for x in bank.get("sub", []))
+        nsub = sum(len(st["subs"]) for st in bank.get("stages", [])) + len(bank.get("sub", []))
+        if bank.get("stages"):
+            multi += 1
+        print("  + %s: %d 题 + %d 阅读卡（%d 科目，%s阶段）"
+              % (exam_id, nq, nr, nsub, (str(len(bank["stages"])) + "个") if bank.get("stages") else "无"))
+        total_q += nq; total_reads += nr
+    print("\nDone. 生成 %d 个考试 bank（其中 %d 个分阶段）；合计 %d 客观题 + %d 阅读卡"
+          % (len(CONFIG), multi, total_q, total_reads))
 
 if __name__ == "__main__":
     main()
