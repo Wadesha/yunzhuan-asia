@@ -3,74 +3,87 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>寰宇零售集团 · 内部职位与周报站</title>
-  <link rel="stylesheet" href="css/styles.css">
+  <title>云转 Asia · 站点导航</title>
+  <style>
+    :root{
+      --bg:#0f1226; --bg2:#161a3a; --card:#1c2150; --line:#2a3170;
+      --txt:#eef1ff; --muted:#9aa3d6; --brand:#6c8cff; --brand2:#42d6c3;
+      --accent:#ffd166;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+      background:radial-gradient(1200px 600px at 70% -10%,#232a66 0%,var(--bg) 55%) ,var(--bg);
+      color:var(--txt);min-height:100vh;line-height:1.6;
+    }
+    .wrap{max-width:980px;margin:0 auto;padding:64px 24px 48px}
+    .brand{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+    .logo{
+      width:52px;height:52px;border-radius:14px;flex:none;
+      background:linear-gradient(135deg,var(--brand),var(--brand2));
+      display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px;color:#0c1030;
+      box-shadow:0 8px 24px rgba(108,140,255,.35);
+    }
+    h1{font-size:30px;letter-spacing:.5px}
+    .sub{color:var(--muted);font-size:15px;margin-top:6px}
+    .hero{margin:26px 0 36px}
+    .hero p{color:var(--muted);max-width:620px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+    .card{
+      background:linear-gradient(180deg,var(--card),var(--bg2));
+      border:1px solid var(--line);border-radius:18px;padding:22px;
+      text-decoration:none;color:inherit;display:block;transition:.18s transform,.18s border-color,.18s box-shadow;
+    }
+    .card:hover{transform:translateY(-4px);border-color:var(--brand);box-shadow:0 14px 40px rgba(108,140,255,.25)}
+    .card .ic{font-size:26px}
+    .card h2{font-size:19px;margin:10px 0 8px}
+    .card p{color:var(--muted);font-size:14px}
+    .tag{display:inline-block;margin-top:14px;font-size:12px;color:var(--accent);
+      background:rgba(255,209,102,.12);border:1px solid rgba(255,209,102,.3);padding:3px 10px;border-radius:999px}
+    .foot{margin-top:40px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:18px}
+    .foot a{color:var(--brand)}
+  </style>
 </head>
 <body>
-
-  <!-- 页头 -->
-  <header class="site-head">
-    <div class="shell">
-      <div class="brand">
-        <div class="mark">GS</div>
-        <div class="names">
-          <div class="zh">寰宇零售集团</div>
-          <div class="en">GlobalSphere Retail Group</div>
-        </div>
+  <div class="wrap">
+    <div class="brand">
+      <div class="logo">云</div>
+      <div>
+        <h1>云转 Asia</h1>
+        <div class="sub">站点导航 · Wade 的个人项目集合</div>
       </div>
-      <div class="tagline">连接全球市场，服务每一位顾客</div>
     </div>
-  </header>
 
-  <!-- 顶部主导航 -->
-  <nav class="nav">
-    <div class="shell" id="nav"></div>
-  </nav>
+    <div class="hero">
+      <p>这里是云转 Asia 的总入口。以下是已上线的站点，点击卡片即可进入。</p>
+    </div>
 
-  <!-- 主体 -->
-  <div class="layout" id="layout">
-    <aside class="side" id="side"></aside>
-    <main class="main" id="main">
-      <!-- 静态降级内容：仅在 JS 未执行或渲染报错时可见，确保页面永不纯空白 -->
-      <div id="bootFallback" class="boot-fallback">
-        <h1 class="page-title">寰宇零售集团</h1>
-        <p class="page-sub">GlobalSphere Retail Group · 内部职位介绍与每周工作报告系统</p>
-        <p class="lead">连接全球市场，服务每一位顾客。本站为集团内部职位介绍与每周工作报告系统，数据为演示样例。</p>
-        <div class="card">
-          <div class="blk-h">正在加载交互界面…</div>
-          <p style="margin:8px 0 0;color:var(--muted)">
-            若本提示长时间停留，说明浏览器未能执行本站脚本，请刷新页面或改用其他浏览器打开。
-          </p>
-        </div>
-        <div class="section-h">站点栏目</div>
-        <ul class="plain">
-          <li>集团概况</li>
-          <li>组织架构</li>
-          <li>部门与职位</li>
-          <li>每周工作报告</li>
-          <li>管理后台</li>
-        </ul>
-      </div>
-    </main>
+    <div class="grid">
+      <a class="card" href="peixun/">
+        <div class="ic">📚</div>
+        <h2>刷题备考系统</h2>
+        <p>覆盖 92 个考试方向、24000+ 道客观题与阅读卡，支持分级下钻、语音朗读、进度云同步。</p>
+        <span class="tag">peixun/</span>
+      </a>
+
+      <a class="card" href="retail-group-site/">
+        <div class="ic">🏢</div>
+        <h2>寰宇零售集团内部站</h2>
+        <p>集团概况、组织架构、部门职位与每周工作报告演示系统。</p>
+        <span class="tag">retail-group-site/</span>
+      </a>
+
+      <a class="card" href="yunzhuan-asia-upload/">
+        <div class="ic">📤</div>
+        <h2>资料上传站</h2>
+        <p>内部资料上传与归档入口。</p>
+        <span class="tag">yunzhuan-asia-upload/</span>
+      </a>
+    </div>
+
+    <div class="foot">
+      <p>本页用于修复根域名 <code>wadez.asia</code> / <code>yunzhuan.asia</code> 的 404（仓库根目录此前缺少 index.html）。如需将根域名直接指向某个子系统，可在 Vercel 中调整域名绑定或添加 vercel.json 重写规则。</p>
+    </div>
   </div>
-
-  <!-- 页脚 -->
-  <footer class="foot">
-    <div class="shell">
-      <span>寰宇零售集团 · 内部职位介绍与每周工作报告系统</span>
-      <span>仅限集团内部使用 · 数据为演示样例</span>
-    </div>
-  </footer>
-
-  <!-- 无脚本兜底（极少数禁用 JS 的环境） -->
-  <noscript>
-    <div class="boot-fallback" style="max-width:1180px;margin:0 auto;padding:28px 24px">
-      <h1 class="page-title">寰宇零售集团</h1>
-      <p class="lead">本站需要启用 JavaScript 才能使用完整交互。请用支持 JavaScript 的浏览器打开本页。</p>
-    </div>
-  </noscript>
-
-  <script src="js/data.js"></script>
-  <script src="js/app.js"></script>
 </body>
 </html>
