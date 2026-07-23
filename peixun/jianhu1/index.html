@@ -154,7 +154,7 @@ a{color:inherit;text-decoration:none;}
   function markWrong(id){ var w=loadWrong(); if(w.indexOf(id)<0){ w.push(id); saveWrong(w); } }
   function clearWrong(id){ var w=loadWrong(); var i=w.indexOf(id); if(i>=0){ w.splice(i,1); saveWrong(w); } }
 
-  var state = { phase:"start", list:[], idx:0, sel:{}, graded:{}, correct:0, wrong:0, reading:false,
+  var state = { phase:"start", list:[], idx:0, sel:{}, graded:{}, skipped:{}, correct:0, wrong:0, reading:false,
                 filter:"all", shuffle:false, autoRead:false, lastReadId:null, attempted:false };
   var AUTOREAD_KEY = "peixun_jianhu1_autoread_v1";
   var PROGRESS_KEY = "peixun_jianhu1_progress_v1";
@@ -175,7 +175,7 @@ a{color:inherit;text-decoration:none;}
       if(state.phase!=="quiz" || !state.list.length) return;
       Sset(PROGRESS_KEY, {
         qids: state.list.map(function(q){ return q.id; }),
-        idx: state.idx, sel: state.sel, graded: state.graded,
+        idx: state.idx, sel: state.sel, graded: state.graded, skipped: state.skipped,
         correct: state.correct, wrong: state.wrong,
         filter: state.filter, shuffle: state.shuffle, ts: Date.now()
       });
@@ -190,7 +190,8 @@ a{color:inherit;text-decoration:none;}
     if(state.attempted) return; // 每场只记一次，防止 re-render 钩子重复触发
     try {
       var total = state.list.length; if(!total) return;
-      var acc = Math.round(100 * state.correct / total);
+      var answered = state.correct + state.wrong;
+      var acc = answered ? Math.round(100 * state.correct / answered) : 0;
       var a = loadAttempts();
       a.unshift({ ts: Date.now(), mode: state.shuffle ? "乱序" : "顺序", filter: state.filter,
                   total: total, correct: state.correct, wrong: state.wrong, acc: acc });
@@ -298,7 +299,7 @@ a{color:inherit;text-decoration:none;}
       if(state.filter!=="all") base = base.filter(function(q){ return q.type===state.filter; });
     }
     if(state.shuffle){ for(var i=base.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=base[i]; base[i]=base[j]; base[j]=t; } }
-    state.list = base; state.idx=0; state.sel={}; state.graded={}; state.correct=0; state.wrong=0; state.lastReadId=null;
+    state.list = base; state.idx=0; state.sel={}; state.graded={}; state.skipped={}; state.correct=0; state.wrong=0; state.lastReadId=null;
   }
 
   function correctIdx(q){
@@ -368,11 +369,15 @@ a{color:inherit;text-decoration:none;}
     if(!acts) return;
     var graded = !!state.graded[q.id];
     var html = "";
-    if(graded){ html = '<button class="btn primary" data-act="next">下一题</button>'; }
-    else if(q.type==="multi"){
+    if(graded){
+      html = '<button class="btn primary" data-act="next">下一题</button>';
+    } else if(q.type==="multi"){
       var has = state.sel[q.id] && state.sel[q.id].length>0;
-      html = '<button class="btn primary" data-act="confirm"'+(has?'':' disabled style="opacity:.45;cursor:not-allowed;"')+'>确认本题</button>';
-    } else { html = ''; }
+      html = '<button class="btn primary" data-act="confirm"'+(has?'':' disabled style="opacity:.45;cursor:not-allowed;"')+'>确认本题</button>'+
+             '<button class="btn ghost" data-act="next">下一题（跳过）</button>';
+    } else {
+      html = '<button class="btn ghost" data-act="next">下一题（不答）</button>';
+    }
     acts.innerHTML = html + '<button class="btn ghost" data-act="exit">保存并退出</button>';
   }
 
@@ -385,7 +390,7 @@ a{color:inherit;text-decoration:none;}
       '<h1 class="page-title">监护培训考核（二）· 刷题</h1>'+
       '<p class="page-sub">题目来源：监护培训考核题库（单选/判断 共 18 题）</p>'+
       '<div class="modnav"><a href="../">刷题目录</a><a href="../jianhu/">监护刷题（一）</a><a href="../wuxiandian/">业余无线电刷题</a><span class="cur">监护刷题（二）</span></div>'+
-      '<div class="notebox">首页可切换 <b>题型</b> 与 <b>模式</b>；进度自动保存到本机，可「继续上次」。开启 <b>自动朗读</b> 后每题进入会朗读题干，<b>判分后会自动朗读正确答案</b>。选择「全部」题型且<b>顺序</b>模式时，<b>刷完一个题型会自动弹窗确认是否继续下一题型</b>（不会因题型结束而终止整场）。</div>'+
+      '<div class="notebox">首页可切换 <b>题型</b> 与 <b>模式</b>；进度自动保存到本机，可「继续上次」。每道题都可直接点 <b>下一题</b> 跳过不答（未答不计入对错，成绩页单列"未答"）。开启 <b>自动朗读</b> 后每题进入会朗读题干，<b>判分后会自动朗读正确答案</b>。选择「全部」题型且<b>顺序</b>模式时，<b>刷完一个题型会自动弹窗确认是否继续下一题型</b>（不会因题型结束而终止整场）。</div>'+
       '<div class="section-h">题型</div><div class="chips">'+
         chip("all","全部")+chip("single","单选")+chip("multi","多选")+(TYPE_ZH.bool?chip("bool","判断"):'')+'</div>'+
       '<div class="section-h">模式</div><div class="chips">'+
@@ -418,12 +423,13 @@ a{color:inherit;text-decoration:none;}
     if(graded){
       actBtn = '<button class="btn primary" data-act="next">下一题</button>';
     } else if(q.type==="multi"){
-      hint = '<div class="hint">本题为多选，勾选多个选项后点「确认本题」判分</div>';
+      hint = '<div class="hint">本题为多选，勾选多个选项后点「确认本题」判分，或直接「下一题」跳过</div>';
       var has = state.sel[q.id] && state.sel[q.id].length>0;
-      actBtn = '<button class="btn primary" data-act="confirm"'+((has)?"":" disabled style=\"opacity:.45;cursor:not-allowed;\"")+'>确认本题</button>';
+      actBtn = '<button class="btn primary" data-act="confirm"'+((has)?"":" disabled style=\"opacity:.45;cursor:not-allowed;\"")+'>确认本题</button>'+
+               '<button class="btn ghost" data-act="next">下一题（跳过）</button>';
     } else {
-      hint = '<div class="hint">点击选项即可自动判分</div>';
-      actBtn = '';
+      hint = '<div class="hint">点击选项即可自动判分，或直接「下一题」跳过本题</div>';
+      actBtn = '<button class="btn ghost" data-act="next">下一题（不答）</button>';
     }
     var readNote = (!speechOK) ? '<div class="hint">当前浏览器不支持语音朗读，可手动阅读题干。</div>'
                   : (state.autoRead
@@ -454,17 +460,25 @@ a{color:inherit;text-decoration:none;}
     var app = document.getElementById("app");
     clearProgress();
     var total = state.list.length;
-    var acc = total? Math.round(100*state.correct/total):0;
-    var wrongItems = state.list.filter(function(q){ return !grade(q, state.sel[q.id]); })
-      .map(function(q){
+    var answered = state.correct + state.wrong;
+    var acc = answered ? Math.round(100*state.correct/answered) : 0;
+    var skippedCount = total - answered;
+    var wrongItems = state.list.filter(function(q){
+      if(state.skipped[q.id]) return true;
+      return !grade(q, state.sel[q.id]);
+    }).map(function(q){
+      if(state.skipped[q.id]){
         return '<div class="wrong-item"><div class="wq">'+esc(q.q)+'</div>'+
-               '<div class="wa">正确答案：'+esc(answerText(q))+'</div></div>';
-      }).join("");
+               '<div class="wa" style="color:var(--muted)">未作答 · 正确答案：'+esc(answerText(q))+'</div></div>';
+      }
+      return '<div class="wrong-item"><div class="wq">'+esc(q.q)+'</div>'+
+             '<div class="wa">正确答案：'+esc(answerText(q))+'</div></div>';
+    }).join("");
     app.innerHTML =
       '<div class="modnav"><a href="../">刷题目录</a><a href="../jianhu/">监护刷题（一）</a><a href="../wuxiandian/">业余无线电刷题</a><span class="cur">监护刷题（二）</span></div>'+
       '<div class="sum"><div class="big">'+acc+'%</div>'+
         '<div class="row"><span>共 <b>'+total+'</b> 题</span><span>答对 <b>'+state.correct+'</b></span>'+
-          '<span>答错 <b>'+state.wrong+'</b></span></div>'+
+          '<span>答错 <b>'+state.wrong+'</b></span>'+(skippedCount?'<span>未答 <b>'+skippedCount+'</b></span>':'')+'</div>'+
         (wrongItems?'<div class="wrong-list"><div class="section-h">错题回顾</div>'+wrongItems+'</div>':'<p class="page-sub">全部答对，干得漂亮。</p>')+
         '<div class="acts">'+
           '<button class="btn primary" data-act="again">再来一次</button>'+
@@ -482,13 +496,17 @@ a{color:inherit;text-decoration:none;}
       while(s > 0 && state.list[s-1].type === finishedType) s--;
       var e2 = state.idx;
       while(e2 < state.list.length-1 && state.list[e2+1].type === nextType) e2++;
-      var finCount = e - s + 1, finCorrect = 0, finWrong = 0;
-      for(var i=s;i<=e;i++){ if(grade(state.list[i], state.sel[state.list[i].id])) finCorrect++; else finWrong++; }
+      var finCount = e - s + 1, finCorrect = 0, finWrong = 0, finSkip = 0;
+      for(var i=s;i<=e;i++){
+        var fi = state.list[i], fid = fi.id;
+        if(state.skipped[fid]){ finSkip++; continue; }
+        if(grade(fi, state.sel[fid])) finCorrect++; else finWrong++;
+      }
       var nextCount = e2 - state.idx + 1;
       var html =
         '<div class="modal-mask" id="typeBreakMask"><div class="modal">'+
           '<h3>本部分已完成</h3>'+
-          '<p><b>'+esc(TYPE_ZH[finishedType]||finishedType)+'</b> 共 '+finCount+' 题，答对 '+finCorrect+' · 答错 '+finWrong+'</p>'+
+          '<p><b>'+esc(TYPE_ZH[finishedType]||finishedType)+'</b> 共 '+finCount+' 题，答对 '+finCorrect+' · 答错 '+finWrong+(finSkip?' · 跳过 '+finSkip:'')+'</p>'+
           '<p>下一部分：<b>'+esc(TYPE_ZH[nextType]||nextType)+'</b> 共 '+nextCount+' 题</p>'+
           '<p class="hint">是否继续下一题型？（不会因题型结束而终止整场）</p>'+
           '<div class="acts">'+
@@ -531,11 +549,13 @@ a{color:inherit;text-decoration:none;}
           var k = arr.indexOf(oi);
           if(k>=0) arr.splice(k,1); else arr.push(oi);
           state.sel[q.id] = arr;
+          delete state.skipped[q.id];
           var el = appEl().querySelector('.q .opt[data-opt="'+oi+'"]');
           if(el) el.className = "opt" + (arr.indexOf(oi)>=0 ? " on" : "");
           renderActions(q);
         } else {
           state.sel[q.id] = oi;
+          delete state.skipped[q.id];
           doGrade(q);
           paintOptions(q);
           showFeedback(q);
@@ -560,6 +580,7 @@ a{color:inherit;text-decoration:none;}
         if(!state.list.length) return;
         state.idx = Math.min(p.idx||0, state.list.length-1);
         state.sel = p.sel || {}; state.graded = p.graded || {};
+        state.skipped = p.skipped || {};
         state.correct = p.correct||0; state.wrong = p.wrong||0;
         state.filter = p.filter; state.shuffle = p.shuffle;
         state.phase="quiz"; state.attempted=false; state.lastReadId=null; render();
@@ -568,13 +589,16 @@ a{color:inherit;text-decoration:none;}
         var qc = state.list[state.idx];
         if(state.graded[qc.id]) return;
         if(!(state.sel[qc.id] && state.sel[qc.id].length>0)) return;
+        delete state.skipped[qc.id];
         doGrade(qc);
         paintOptions(qc); showFeedback(qc); renderActions(qc);
         readAnswer(qc);
         saveProgress();
       }
       else if(act==="next"){
-        var _prevType = state.list[state.idx].type;
+        var qq = state.list[state.idx];
+        if(!state.graded[qq.id]){ state.skipped[qq.id] = true; } // 未作答直接下一题 = 跳过
+        var _prevType = qq.type;
         state.idx++;
         if(state.idx >= state.list.length){ state.phase="summary"; render(); saveProgress(); return; }
         if(state.filter==="all" && !state.shuffle && state.list[state.idx].type !== _prevType){
