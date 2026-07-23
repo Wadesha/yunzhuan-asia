@@ -89,6 +89,13 @@ a{color:inherit;text-decoration:none;}
 .footnav a:hover{text-decoration:underline;}
 .foot .shell{flex-direction:column;align-items:flex-start;}
 .foot-tip{font-size:12px;color:#9aa7b0;}
+.modal-mask{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(20,20,22,.45);
+  display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;}
+.modal{background:var(--paper);border:1px solid var(--line);max-width:440px;width:100%;padding:26px;
+  box-shadow:0 12px 40px rgba(0,0,0,.18);}
+.modal h3{margin:0 0 8px;font-size:19px;letter-spacing:1px;color:var(--accent);}
+.modal p{margin:7px 0;color:var(--ink-soft);font-size:14px;line-height:1.7;}
+.modal .acts{margin-top:18px;display:flex;gap:12px;flex-wrap:wrap;}
 </style>
 </head>
 <body>
@@ -378,7 +385,7 @@ a{color:inherit;text-decoration:none;}
       '<h1 class="page-title">监护培训考核（二）· 刷题</h1>'+
       '<p class="page-sub">题目来源：监护培训考核题库（单选/判断 共 18 题）</p>'+
       '<div class="modnav"><a href="../">刷题目录</a><a href="../jianhu/">监护刷题（一）</a><a href="../wuxiandian/">业余无线电刷题</a><span class="cur">监护刷题（二）</span></div>'+
-      '<div class="notebox">首页可切换 <b>题型</b> 与 <b>模式</b>；进度自动保存到本机，可「继续上次」。开启 <b>自动朗读</b> 后每题进入会朗读题干，<b>判分后会自动朗读正确答案</b>。</div>'+
+      '<div class="notebox">首页可切换 <b>题型</b> 与 <b>模式</b>；进度自动保存到本机，可「继续上次」。开启 <b>自动朗读</b> 后每题进入会朗读题干，<b>判分后会自动朗读正确答案</b>。选择「全部」题型且<b>顺序</b>模式时，<b>刷完一个题型会自动弹窗确认是否继续下一题型</b>（不会因题型结束而终止整场）。</div>'+
       '<div class="section-h">题型</div><div class="chips">'+
         chip("all","全部")+chip("single","单选")+chip("multi","多选")+(TYPE_ZH.bool?chip("bool","判断"):'')+'</div>'+
       '<div class="section-h">模式</div><div class="chips">'+
@@ -465,6 +472,35 @@ a{color:inherit;text-decoration:none;}
         '</div></div>';
   }
 
+  // 刷完一个题型、即将切入下一题型时的确认弹窗（仅「全部+顺序」模式触发）
+  function showTypeBreakModal(){
+    try {
+      var nextType = state.list[state.idx].type;
+      var e = state.idx - 1;
+      var finishedType = state.list[e].type;
+      var s = e;
+      while(s > 0 && state.list[s-1].type === finishedType) s--;
+      var e2 = state.idx;
+      while(e2 < state.list.length-1 && state.list[e2+1].type === nextType) e2++;
+      var finCount = e - s + 1, finCorrect = 0, finWrong = 0;
+      for(var i=s;i<=e;i++){ if(grade(state.list[i], state.sel[state.list[i].id])) finCorrect++; else finWrong++; }
+      var nextCount = e2 - state.idx + 1;
+      var html =
+        '<div class="modal-mask" id="typeBreakMask"><div class="modal">'+
+          '<h3>本部分已完成</h3>'+
+          '<p><b>'+esc(TYPE_ZH[finishedType]||finishedType)+'</b> 共 '+finCount+' 题，答对 '+finCorrect+' · 答错 '+finWrong+'</p>'+
+          '<p>下一部分：<b>'+esc(TYPE_ZH[nextType]||nextType)+'</b> 共 '+nextCount+' 题</p>'+
+          '<p class="hint">是否继续下一题型？（不会因题型结束而终止整场）</p>'+
+          '<div class="acts">'+
+            '<button class="btn primary" data-act="continue-type">继续下一题型</button>'+
+            '<button class="btn ghost" data-act="end-type">结束并查看成绩</button>'+
+          '</div>'+
+        '</div></div>';
+      var tmp = document.createElement("div"); tmp.innerHTML = html;
+      document.body.appendChild(tmp.firstChild);
+    } catch(err){ render(); }
+  }
+
   function render(){
     if(state.phase==="start"){ renderStart(); return; }
     if(state.phase==="summary"){ renderSummary(); return; }
@@ -538,10 +574,23 @@ a{color:inherit;text-decoration:none;}
         saveProgress();
       }
       else if(act==="next"){
+        var _prevType = state.list[state.idx].type;
         state.idx++;
-        if(state.idx >= state.list.length){ state.phase="summary"; render(); }
-        else { render(); }
-        saveProgress();
+        if(state.idx >= state.list.length){ state.phase="summary"; render(); saveProgress(); return; }
+        if(state.filter==="all" && !state.shuffle && state.list[state.idx].type !== _prevType){
+          saveProgress();
+          showTypeBreakModal();
+          return;
+        }
+        render(); saveProgress();
+      }
+      else if(act==="continue-type"){
+        var _m = document.getElementById("typeBreakMask"); if(_m) _m.parentNode.removeChild(_m);
+        render(); saveProgress();
+      }
+      else if(act==="end-type"){
+        var _m2 = document.getElementById("typeBreakMask"); if(_m2) _m2.parentNode.removeChild(_m2);
+        state.phase="summary"; render();
       }
       else if(act==="again"){ clearProgress(); state.phase="quiz"; state.attempted=false; buildList(false); render(); }
       else if(act==="home"){ clearProgress(); state.phase="start"; render(); }
