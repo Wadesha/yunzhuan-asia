@@ -15,7 +15,7 @@
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
   font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased;}
+  font-size:13.5px;line-height:1.6;-webkit-font-smoothing:antialiased;}
 a{color:inherit;text-decoration:none;}
 .shell{max-width:var(--max);margin:0 auto;padding:0 24px;}
 .site-head{background:var(--paper);border-bottom:1px solid var(--line);}
@@ -24,21 +24,21 @@ a{color:inherit;text-decoration:none;}
 .brand .mark{font-family:Georgia,"Times New Roman",serif;font-weight:700;font-size:20px;letter-spacing:2px;
   color:var(--paper);background:var(--accent);border:1px solid var(--accent);padding:6px 10px;line-height:1;}
 .brand .names{line-height:1.25;}
-.brand .zh{font-size:18px;font-weight:700;letter-spacing:1px;}
+.brand .zh{font-size:16px;font-weight:700;letter-spacing:1px;}
 .brand .en{font-size:11px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;}
 .site-head .tagline{font-size:13px;color:var(--muted);letter-spacing:1px;}
 .wrap{max-width:var(--max);margin:0 auto;padding:30px 24px 60px;}
-.page-title{font-size:26px;letter-spacing:1px;margin:0 0 4px;font-family:Georgia,"Noto Serif SC",serif;}
-.page-sub{color:var(--muted);font-size:14px;margin:0 0 26px;}
+.page-title{font-size:22px;letter-spacing:1px;margin:0 0 4px;font-family:Georgia,"Noto Serif SC",serif;}
+.page-sub{color:var(--muted);font-size:13px;margin:0 0 22px;}
 .section-h{font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--accent-2);
   margin:30px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line-soft);}
 .chips{display:flex;flex-wrap:wrap;gap:8px;}
-.chip{font-size:13.5px;padding:7px 16px;border:1px solid var(--line);background:var(--paper);
+.chip{font-size:12.5px;padding:6px 14px;border:1px solid var(--line);background:var(--paper);
   color:var(--ink-soft);cursor:pointer;letter-spacing:.5px;}
 .chip:hover{border-color:var(--accent-2);color:var(--accent);}
 .chip.on{background:var(--accent);border-color:var(--accent);color:var(--paper);}
 .acts{margin-top:26px;display:flex;gap:12px;flex-wrap:wrap;}
-.btn{display:inline-block;font-size:14px;letter-spacing:.5px;padding:10px 22px;border:1px solid var(--accent);
+.btn{display:inline-block;font-size:13px;letter-spacing:.5px;padding:7px 16px;border:1px solid var(--accent);
   color:var(--accent);background:var(--paper);cursor:pointer;font-family:inherit;}
 .btn:hover{background:var(--accent);color:var(--paper);}
 .btn.primary{background:var(--accent);color:var(--paper);}
@@ -50,9 +50,9 @@ a{color:inherit;text-decoration:none;}
 .bar .score{font-size:13px;color:var(--accent);letter-spacing:.5px;}
 .prog{height:4px;background:var(--line);margin-bottom:22px;}
 .prog .fill{height:100%;background:var(--accent);transition:width .2s;}
-.q{background:var(--paper);border:1px solid var(--line);padding:24px 26px;}
-.qt{font-size:17px;font-weight:600;line-height:1.6;margin-bottom:18px;}
-.hint{font-size:12px;color:var(--muted);margin-bottom:10px;letter-spacing:.5px;}
+.q{background:var(--paper);border:1px solid var(--line);padding:20px 22px;}
+.qt{font-size:15.5px;font-weight:600;line-height:1.55;margin-bottom:16px;}
+.hint{font-size:11px;color:var(--muted);margin-bottom:10px;letter-spacing:.5px;}
 .modnav{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 20px;}
 .modnav a{font-size:13.5px;color:var(--accent);border:1px solid var(--line);padding:7px 15px;letter-spacing:.5px;}
 .modnav a:hover{background:var(--accent);color:var(--paper);border-color:var(--accent);}
@@ -60,7 +60,7 @@ a{color:inherit;text-decoration:none;}
 .notebox{background:var(--accent-bg);border:1px solid var(--line);padding:12px 16px;font-size:13px;color:var(--ink-soft);margin:0 0 22px;line-height:1.75;}
 .notebox b{color:var(--accent);font-weight:600;}
 .opts{display:flex;flex-direction:column;gap:10px;}
-.opt{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);
+.opt{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);
   background:var(--bg);cursor:pointer;}
 .opt:hover{border-color:var(--accent-2);}
 .opt.on{border-color:var(--accent);background:var(--accent-bg);}
@@ -69,11 +69,11 @@ a{color:inherit;text-decoration:none;}
 .opt.ok:hover,.opt.no:hover{border-color:inherit;}
 .opt .lk{font-weight:700;color:var(--accent);min-width:20px;text-align:center;font-family:Georgia,serif;}
 .opt .lt{color:var(--ink-soft);}
-.fb{margin-top:16px;padding:12px 14px;font-size:14px;letter-spacing:.5px;}
+.fb{margin-top:14px;padding:10px 12px;font-size:13px;letter-spacing:.5px;}
 .fb.ok{background:var(--ok-bg);color:var(--ok);border:1px solid #cfe3d4;}
 .fb.no{background:var(--no-bg);color:var(--no);border:1px solid #e7cfc9;}
 .sum{background:var(--paper);border:1px solid var(--line);padding:26px;}
-.sum .big{font-size:34px;font-weight:700;font-family:Georgia,serif;color:var(--accent);}
+.sum .big{font-size:30px;font-weight:700;font-family:Georgia,serif;color:var(--accent);}
 .sum .row{display:flex;gap:24px;flex-wrap:wrap;margin:14px 0 6px;color:var(--ink-soft);}
 .sum .row b{color:var(--ink);}
 .wrong-list{margin-top:18px;}
@@ -93,7 +93,7 @@ a{color:inherit;text-decoration:none;}
   display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;}
 .modal{background:var(--paper);border:1px solid var(--line);max-width:440px;width:100%;padding:26px;
   box-shadow:0 12px 40px rgba(0,0,0,.18);}
-.modal h3{margin:0 0 8px;font-size:19px;letter-spacing:1px;color:var(--accent);}
+.modal h3{margin:0 0 8px;font-size:17px;letter-spacing:1px;color:var(--accent);}
 .modal p{margin:7px 0;color:var(--ink-soft);font-size:14px;line-height:1.7;}
 .modal .acts{margin-top:18px;display:flex;gap:12px;flex-wrap:wrap;}
 </style>
@@ -368,6 +368,7 @@ a{color:inherit;text-decoration:none;}
     var acts = appEl().querySelector(".q .acts");
     if(!acts) return;
     var graded = !!state.graded[q.id];
+    var prevBtn = '<button class="btn ghost" data-act="prev"'+(state.idx>0?'':' disabled style="opacity:.45;cursor:not-allowed;"')+'>上一题</button>';
     var html = "";
     if(graded){
       html = '<button class="btn primary" data-act="next">下一题</button>';
@@ -378,7 +379,7 @@ a{color:inherit;text-decoration:none;}
     } else {
       html = '<button class="btn ghost" data-act="next">下一题（不答）</button>';
     }
-    acts.innerHTML = html + '<button class="btn ghost" data-act="exit">保存并退出</button>';
+    acts.innerHTML = prevBtn + html + '<button class="btn ghost" data-act="exit">保存并退出</button>';
   }
 
   function renderStart(){
@@ -419,6 +420,7 @@ a{color:inherit;text-decoration:none;}
            ' · 正确答案：'+esc(answerText(q))+'</div>';
     }
     var hint = "";
+    var prevBtn = '<button class="btn ghost" data-act="prev"'+(state.idx>0?'':' disabled style="opacity:.45;cursor:not-allowed;"')+'>上一题</button>';
     var actBtn;
     if(graded){
       actBtn = '<button class="btn primary" data-act="next">下一题</button>';
@@ -444,7 +446,7 @@ a{color:inherit;text-decoration:none;}
         readNote+
         '<div class="opts">'+hint+optHtml(q)+'</div>'+
         (graded?fb:'')+
-        '<div class="acts">'+actBtn+'<button class="btn ghost" data-act="exit">保存并退出</button></div>'+
+        '<div class="acts">'+prevBtn+actBtn+'<button class="btn ghost" data-act="exit">保存并退出</button></div>'+
       '</div>';
     if(autoFire){
       state.lastReadId = q.id; state.reading = true;
@@ -511,6 +513,7 @@ a{color:inherit;text-decoration:none;}
           '<p class="hint">是否继续下一题型？（不会因题型结束而终止整场）</p>'+
           '<div class="acts">'+
             '<button class="btn primary" data-act="continue-type">继续下一题型</button>'+
+            '<button class="btn ghost" data-act="prev">返回上一题</button>'+
             '<button class="btn ghost" data-act="end-type">结束并查看成绩</button>'+
           '</div>'+
         '</div></div>';
@@ -594,6 +597,11 @@ a{color:inherit;text-decoration:none;}
         paintOptions(qc); showFeedback(qc); renderActions(qc);
         readAnswer(qc);
         saveProgress();
+      }
+      else if(act==="prev"){
+        var _mb = document.getElementById("typeBreakMask");
+        if(_mb) _mb.parentNode.removeChild(_mb);
+        if(state.idx>0){ state.idx--; render(); saveProgress(); }
       }
       else if(act==="next"){
         var qq = state.list[state.idx];
